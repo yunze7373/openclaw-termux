@@ -84,7 +84,7 @@ function normalizeSchemaNode(
         );
         normalized.additionalProperties =
           res.schema ?? (schema.additionalProperties as JsonSchema);
-        if (res.unsupportedPaths.length > 0) unsupported.add(pathLabel);
+        for (const entry of res.unsupportedPaths) unsupported.add(entry);
       }
     }
   } else if (type === "array") {
@@ -94,9 +94,9 @@ function normalizeSchemaNode(
     if (!itemsSchema) {
       unsupported.add(pathLabel);
     } else {
-      const res = normalizeSchemaNode(itemsSchema, [...path, "*"]);
+      const res = normalizeSchemaNode(itemsSchema, [...path]);
       normalized.items = res.schema ?? itemsSchema;
-      if (res.unsupportedPaths.length > 0) unsupported.add(pathLabel);
+      for (const entry of res.unsupportedPaths) unsupported.add(entry);
     }
   } else if (
     type !== "string" &&
@@ -189,6 +189,28 @@ function normalizeUnion(
         nullable,
       },
       unsupportedPaths: [],
+    };
+  }
+
+  // Allow complex unions (e.g. objects) to pass through.
+  // The renderer will handle them (e.g. via a variant selector).
+  if (remaining.length > 1) {
+    // Normalize children
+    const unsupported: string[] = [];
+    const normalizedRemaining: JsonSchema[] = [];
+    for (const [idx, child] of remaining.entries()) {
+      const res = normalizeSchemaNode(child, [...path, `union-${idx}`]);
+      if (res.schema) normalizedRemaining.push(res.schema);
+      unsupported.push(...res.unsupportedPaths);
+    }
+    return {
+      schema: {
+        ...schema,
+        anyOf: undefined,
+        oneOf: normalizedRemaining,
+        nullable,
+      },
+      unsupportedPaths: unsupported, // Only bubble up if children are unsupported
     };
   }
 
