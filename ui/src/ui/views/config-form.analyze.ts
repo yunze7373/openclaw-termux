@@ -69,9 +69,7 @@ function normalizeSchemaNode(
     }
     normalized.properties = normalizedProps;
 
-    if (schema.additionalProperties === true) {
-      unsupported.add(pathLabel);
-    } else if (schema.additionalProperties === false) {
+    if (schema.additionalProperties === false) {
       normalized.additionalProperties = false;
     } else if (
       schema.additionalProperties &&
