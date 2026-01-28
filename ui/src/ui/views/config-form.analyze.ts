@@ -116,8 +116,7 @@ function normalizeUnion(
   schema: JsonSchema,
   path: Array<string | number>,
 ): ConfigSchemaAnalysis | null {
-  if (schema.allOf) return null;
-  const union = schema.anyOf ?? schema.oneOf;
+  const union = schema.anyOf ?? schema.oneOf ?? schema.allOf;
   if (!union) return null;
 
   const literals: unknown[] = [];
@@ -125,7 +124,7 @@ function normalizeUnion(
   let nullable = false;
 
   for (const entry of union) {
-    if (!entry || typeof entry !== "object") return null;
+    if (!entry || typeof entry !== "object") continue;
     if (Array.isArray(entry.enum)) {
       const { enumValues, nullable: enumNullable } = normalizeEnum(entry.enum);
       literals.push(...enumValues);
@@ -188,6 +187,25 @@ function normalizeUnion(
       },
       unsupportedPaths: [],
     };
+  }
+
+  // Handle allOf by merging or picking the most descriptive one
+  if (schema.allOf) {
+    // For UI purposes, we often just want the most specific object
+    const objects = remaining.filter((r) => schemaType(r) === "object" || r.properties);
+    if (objects.length > 0) {
+      const res = normalizeSchemaNode(objects[objects.length - 1], path);
+      return res;
+    }
+    // Also handle primitives (e.g. string with transform might be allOf)
+    const primitives = remaining.filter((r) => {
+      const t = schemaType(r);
+      return t && ["string", "number", "integer", "boolean"].includes(t);
+    });
+    if (primitives.length > 0) {
+      const res = normalizeSchemaNode(primitives[primitives.length - 1], path);
+      return res;
+    }
   }
 
   // Allow complex unions (e.g. objects) to pass through.
