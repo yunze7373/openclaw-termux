@@ -46,9 +46,14 @@ function normalizeSchemaNode(
   }
 
   const nullable = Array.isArray(schema.type) && schema.type.includes("null");
-  const type =
+  let type =
     schemaType(schema) ??
     (schema.properties || schema.additionalProperties ? "object" : undefined);
+
+  if (!type && isAnySchema(schema)) {
+    type = "string";
+  }
+
   normalized.type = type ?? schema.type;
   normalized.nullable = nullable || schema.nullable;
 
