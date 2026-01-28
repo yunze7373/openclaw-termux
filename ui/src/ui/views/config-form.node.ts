@@ -362,8 +362,9 @@ function renderObject(params: {
   }
 
   // Nested objects get collapsible treatment
+  const isChannelRoot = path.length === 2 && path[0] === "channels";
   return html`
-    <details class="cfg-object" open>
+    <details class="cfg-object" ?open=${!isChannelRoot}>
       <summary class="cfg-object__header">
         <span class="cfg-object__title">${label}</span>
         <span class="cfg-object__chevron">${icons.chevronDown}</span>
