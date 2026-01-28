@@ -84,9 +84,21 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
     ...skill.missing.config.map((c) => `config:${c}`),
     ...skill.missing.os.map((o) => `os:${o}`),
   ];
-  const reasons: string[] = [];
-  if (skill.disabled) reasons.push("disabled");
-  if (skill.blockedByAllowlist) reasons.push("blocked by allowlist");
+  
+  let statusLabel = "eligible";
+  let statusClass = "chip-ok";
+  
+  if (skill.disabled) {
+    statusLabel = "disabled";
+    statusClass = "chip-warn";
+  } else if (skill.blockedByAllowlist) {
+    statusLabel = "blocked (allowlist)";
+    statusClass = "chip-warn";
+  } else if (!skill.eligible) {
+    statusLabel = "unavailable";
+    statusClass = "chip-warn";
+  }
+
   return html`
     <div class="list-item">
       <div class="list-main">
@@ -96,22 +108,14 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
         <div class="list-sub">${clampText(skill.description, 140)}</div>
         <div class="chip-row" style="margin-top: 6px;">
           <span class="chip">${skill.source}</span>
-          <span class="chip ${skill.eligible ? "chip-ok" : "chip-warn"}">
-            ${skill.eligible ? "eligible" : "blocked"}
+          <span class="chip ${statusClass}">
+            ${statusLabel}
           </span>
-          ${skill.disabled ? html`<span class="chip chip-warn">disabled</span>` : nothing}
         </div>
         ${missing.length > 0
           ? html`
               <div class="muted" style="margin-top: 6px;">
                 Missing: ${missing.join(", ")}
-              </div>
-            `
-          : nothing}
-        ${reasons.length > 0
-          ? html`
-              <div class="muted" style="margin-top: 6px;">
-                Reason: ${reasons.join(", ")}
               </div>
             `
           : nothing}

@@ -610,3 +610,108 @@ function renderMapField(params: {
     </div>
   `;
 }
+
+function renderUnion(params: {
+  schema: JsonSchema;
+  value: unknown;
+  path: Array<string | number>;
+  hints: ConfigUiHints;
+  unsupported: Set<string>;
+  disabled: boolean;
+  showLabel?: boolean;
+  variants: JsonSchema[];
+  onPatch: (path: Array<string | number>, value: unknown) => void;
+}): TemplateResult | typeof nothing {
+  const { schema, value, path, disabled, variants, onPatch } = params;
+  const showLabel = params.showLabel ?? true;
+  const hint = hintForPath(path, params.hints);
+  const label = hint?.label ?? schema.title ?? humanize(String(path.at(-1)));
+  const help = hint?.help ?? schema.description;
+
+  const nonNull = variants.filter(
+    (v) => !(v.type === "null" || (Array.isArray(v.type) && v.type.includes("null"))),
+  );
+
+  if (nonNull.length === 1) {
+    return renderNode({ ...params, schema: nonNull[0] });
+  }
+
+  // Check if it's a set of literal values (enum-like)
+  const extractLiteral = (v: JsonSchema): unknown | undefined => {
+    if (v.const !== undefined) return v.const;
+    if (v.enum && v.enum.length === 1) return v.enum[0];
+    return undefined;
+  };
+  const literals = nonNull.map(extractLiteral);
+  const allLiterals = literals.every((v) => v !== undefined);
+
+  if (allLiterals && literals.length > 0 && literals.length <= 5) {
+    // Use segmented control for small sets
+    const resolvedValue = value ?? schema.default;
+    return html`
+      <div class="cfg-field">
+        ${showLabel ? html`<label class="cfg-field__label">${label}</label>` : nothing}
+        ${help ? html`<div class="cfg-field__help">${help}</div>` : nothing}
+        <div class="cfg-segmented">
+          ${literals.map(
+            (lit, idx) => html`
+            <button
+              type="button"
+              class="cfg-segmented__btn ${
+                lit === resolvedValue || String(lit) === String(resolvedValue) ? "active" : ""
+              }"
+              ?disabled=${disabled}
+              @click=${() => onPatch(path, lit)}
+            >
+              ${String(lit)}
+            </button>
+          `,
+          )}
+        </div>
+      </div>
+    `;
+  }
+
+  if (allLiterals && literals.length > 5) {
+    // Use dropdown for larger sets
+    return renderSelect({ ...params, options: literals, value: value ?? schema.default });
+  }
+
+  // Handle mixed primitive types
+  const primitiveTypes = new Set(
+    nonNull.map((variant) => schemaType(variant)).filter(Boolean),
+  );
+  const normalizedTypes = new Set(
+    [...primitiveTypes].map((v) => (v === "integer" ? "number" : v)),
+  );
+
+  if (
+    [...normalizedTypes].every((v) => ["string", "number", "boolean"].includes(v as string))
+  ) {
+    const hasString = normalizedTypes.has("string");
+    const hasNumber = normalizedTypes.has("number");
+    const hasBoolean = normalizedTypes.has("boolean");
+
+    if (hasBoolean && normalizedTypes.size === 1) {
+      return renderNode({
+        ...params,
+        schema: { ...schema, type: "boolean", anyOf: undefined, oneOf: undefined },
+      });
+    }
+
+    if (hasString || hasNumber) {
+      return renderTextInput({
+        ...params,
+        inputType: hasNumber && !hasString ? "number" : "text",
+      });
+    }
+  }
+
+  // Fallback for complex unions
+  return html`
+    <div class="cfg-field cfg-field--error">
+      <div class="cfg-field__label">${label}</div>
+      <div class="cfg-field__error">Complex union types not supported in form view. Use Raw mode.</div>
+    </div>
+  `;
+}
