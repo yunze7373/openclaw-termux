@@ -445,8 +445,12 @@ export function renderConfig(props: ConfigProps) {
                     })}
                 ${formUnsafe
                   ? html`<div class="callout danger" style="margin-top: 12px;">
-                      Form view can't safely edit some fields.
-                      Use Raw to avoid losing config entries.
+                      <div>
+                        Form view can't safely edit some fields. Use Raw to avoid losing config entries.
+                      </div>
+                      <div class="muted" style="margin-top: 4px; font-size: 0.85em;">
+                        Unsupported paths: ${analysis.unsupportedPaths.join(", ")}
+                      </div>
                     </div>`
                   : nothing}
               `
