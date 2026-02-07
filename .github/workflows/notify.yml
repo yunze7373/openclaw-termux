@@ -1,0 +1,58 @@
+name: Notify on CI Failure
+
+on:
+  workflow_run:
+    workflows: ["CI/CD Auto Check", "AI Code Review"]
+    types: [completed]
+    branches: [main, dev]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    
+    steps:
+    - name: Get workflow details
+      id: workflow
+      run: |
+        echo "workflow_name=${{ github.event.workflow_run.name }}" >> $GITHUB_OUTPUT
+        echo "run_url=${{ github.event.workflow_run.html_url }}" >> $GITHUB_OUTPUT
+        echo "branch=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_OUTPUT
+        echo "commit=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+        
+    - name: Send Telegram notification
+      if: ${{ secrets.TELEGRAM_BOT_TOKEN && secrets.TELEGRAM_CHAT_ID }}
+      run: |
+        MESSAGE="🚨 CI/CD 失败通知
+        
+工作流: ${{ steps.workflow.outputs.workflow_name }}
+分支: ${{ steps.workflow.outputs.branch }}
+提交: ${{ steps.workflow.outputs.commit }}
+
+查看详情: ${{ steps.workflow.outputs.run_url }}"
+        
+        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+          -d text="$MESSAGE" \
+          -d parse_mode="HTML"
+      continue-on-error: true
+    
+    - name: Create issue on repeated failures
+      if: ${{ github.event.workflow_run.run_attempt > 2 }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const issue = await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `🚨 CI/CD 持续失败: ${{ steps.workflow.outputs.workflow_name }}`,
+            body: `工作流 **${{ steps.workflow.outputs.workflow_name }}** 在分支 \`${{ steps.workflow.outputs.branch }}\` 上连续失败 ${{ github.event.workflow_run.run_attempt }} 次。
+            
+**详情:**
+- 提交: ${{ steps.workflow.outputs.commit }}
+- 运行地址: ${{ steps.workflow.outputs.run_url }}
+
+请尽快检查并修复。`,
+            labels: ['ci-failure', 'automated']
+          });
+          console.log('Created issue:', issue.data.number);
