@@ -47,6 +47,19 @@ export function pickLastDeliverablePayload(payloads: DeliveryPayload[]) {
   return undefined;
 }
 
+export function pickLastDeliverablePayload(payloads: DeliveryPayload[]) {
+  for (let i = payloads.length - 1; i >= 0; i--) {
+    const payload = payloads[i];
+    const text = (payload?.text ?? "").trim();
+    const hasMedia = Boolean(payload?.mediaUrl) || (payload?.mediaUrls?.length ?? 0) > 0;
+    const hasChannelData = Object.keys(payload?.channelData ?? {}).length > 0;
+    if (text || hasMedia || hasChannelData) {
+      return payload;
+    }
+  }
+  return undefined;
+}
+
 /**
  * Check if all payloads are just heartbeat ack responses (HEARTBEAT_OK).
  * Returns true if delivery should be skipped because there's no real content.
