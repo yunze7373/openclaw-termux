@@ -13,7 +13,7 @@
 
 - ✅ **Android Termux native support**: no root, no standard Linux assumptions
 - ✅ **Multi-node distributed architecture**: Termux as control plane + external compute nodes
-- ✅ **Chinese voice system (XiaoJi)**: tailored assistant voice workflow
+- ✅ **Voice system**: tailored assistant voice workflow
 - ✅ **Enhanced memory system**: Supabase Vector store + embeddings pipeline
 - ✅ **Custom skills**: Termux-first tooling, automation, and node workflows
 
@@ -23,7 +23,7 @@
 flowchart LR
   subgraph A["Android Phone (Termux)"]
     GW["Gateway / Control Plane\nws://127.0.0.1:18789"]
-    XJ["XiaoJi\nChinese voice + notifier"]
+    VOICE["Voice Assistant\nNotifier + TTS"]
     SK["Custom Skills\nTermux-first tools"]
   end
 
@@ -31,20 +31,20 @@ flowchart LR
     SB["Supabase Vector\n(qwen3-embedding etc.)"]
   end
 
-  subgraph W["WSL2 (Windows GPU)"]
-    C3D["Compute Node\n(cortex3d-wsl)"]
+  subgraph W["Compute Node (GPU)"]
+    C3D["Heavy Compute\n(GPU workloads)"]
   end
 
-  subgraph MM["Mac mini"]
-    OLL["Inference / Ollama\nTTS / heavy reasoning"]
+  subgraph MM["Inference Node"]
+    OLL["LLM Inference\nTTS / reasoning"]
   end
 
-  subgraph P["Raspberry Pi"]
-    EDGE["Edge Node\nalways-on jobs"]
+  subgraph P["Edge Node"]
+    EDGE["Always-On Jobs\nmonitoring"]
   end
 
   GW <--> SB
-  XJ --> GW
+  VOICE --> GW
   SK --> GW
 
   GW <--> C3D
@@ -120,7 +120,7 @@ Typical production layout:
 - **Main node**: Android (Termux) runs the Gateway and coordinates everything.
 - **Compute node**: WSL2 provides GPU-heavy tasks.
 - **Inference node**: Mac mini runs Ollama, TTS, or long-running inference services.
-- **Edge node**: Raspberry Pi handles always-on small jobs.
+- **Edge node**: handles always-on small jobs and monitoring.
 
 If you already have nodes registered, use your node runner workflow to attach them to the Gateway.
 
@@ -164,13 +164,12 @@ See:
 This is a **private, Termux-focused fork**.
 
 - Forked from: `moltbot/moltbot` (upstream)
-- Policy: periodically cherry-pick upstream changes, while keeping Android/Termux patches and XiaoJi/memory enhancements stable.
+- Policy: periodically cherry-pick upstream changes, while keeping Android/Termux patches and custom enhancements stable.
 
 ## Documentation Index
 
 - Project context: `PROJECT-CONTEXT.md`
 - Android/Termux fixes: `ANDROID_FIXES.md`, `ANDROID_FIXES_CN.md`
-- XiaoJi guide: `XIAOJI.md`
 - Contributing: `CONTRIBUTING.md`
 - Security: `SECURITY.md`
 
