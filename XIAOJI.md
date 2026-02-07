@@ -13,17 +13,17 @@
 ## 📋 Notion 任务管理
 
 ### 数据库配置
-- **数据库 ID**: `a3bfdc46-7fea-44a1-9f6d-cb17b6242998`
+- **数据库 ID**: `300c3533-cc2f-812e-8789-ff7f8de1f31c`
 - **URL**: https://www.notion.so/a3bfdc467fea44a19f6dcb17b6242998
 
 ### 任务状态定义
 | 状态 | 含义 | 我的动作 |
 |------|------|----------|
-| 待分配 | 新任务，等待分配 | 分析任务，分配给合适的 Agent |
-| 进行中 | Agent 正在处理 | 定期检查进度 |
-| 阻塞 | 遇到问题无法继续 | 协调资源解决，必要时通知韩哥 |
-| 待审核 | 完成开发，等待审核 | 通知韩哥审核 |
-| 完成 | 已合并到 main | 归档 |
+| Pending | 新任务，等Pending | 分析任务，分配给合适的 Agent |
+| In Progress | Agent 正在处理 | 定期检查进度 |
+| Blocked | 遇到问题无法继续 | 协调资源解决，必要时通知韩哥 |
+| Review | Done开发，等Review | 通知韩哥审核 |
+| Done | 已合并到 main | 归档 |
 
 ---
 
@@ -31,16 +31,16 @@
 
 ```
 1. 读取 Notion Moltbot Tasks
-2. 处理 "待分配" 任务:
+2. 处理 "Pending" 任务:
    - P0/P1 优先
    - 根据任务类型选择 Agent
-   - 更新状态为 "进行中"
-3. 检查 "进行中" 任务:
+   - 更新状态为 "In Progress"
+3. 检查 "In Progress" 任务:
    - 超过 2 小时无更新 → 查询状态
-4. 处理 "阻塞" 任务:
+4. 处理 "Blocked" 任务:
    - 分析原因
    - 尝试解决或通知韩哥
-5. 汇报 "待审核" 任务给韩哥
+5. 汇报 "Review" 任务给韩哥
 ```
 
 ---
@@ -78,7 +78,7 @@ sessions_spawn --task "
 XXX
 
 工作目录: ~/dev/openclaw-termux/
-完成后提交并推送到 origin。
+Done后提交并推送到 origin。
 "
 ```
 
@@ -99,7 +99,7 @@ nodes run --node cortex3d-wsl --command "
 cd ~/dev/openclaw-termux
 git pull origin main
 pnpm test
-echo '测试完成'
+echo '测试Done'
 "
 ```
 
@@ -107,16 +107,16 @@ echo '测试完成'
 
 ## 🔧 常用 Notion 操作
 
-### 读取待分配任务
+### 读取Pending任务
 ```bash
 NOTION_KEY=$(cat ~/.config/notion/api_key)
-TASKS_DB="a3bfdc46-7fea-44a1-9f6d-cb17b6242998"
+TASKS_DB="300c3533-cc2f-812e-8789-ff7f8de1f31c"
 
 curl -s -X POST "https://api.notion.com/v1/databases/$TASKS_DB/query" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
   -H "Content-Type: application/json" \
-  -d '{"filter": {"property": "状态", "select": {"equals": "待分配"}}}' \
+  -d '{"filter": {"property": "状态", "select": {"equals": "Pending"}}}' \
   | jq '.results[] | {id: .id, task_id: .properties["Task ID"].title[0].plain_text, title: .properties["标题"].rich_text[0].plain_text}'
 ```
 
@@ -126,7 +126,7 @@ curl -s -X PATCH "https://api.notion.com/v1/pages/<page_id>" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
   -H "Content-Type: application/json" \
-  -d '{"properties": {"状态": {"select": {"name": "进行中"}}, "负责人": {"select": {"name": "Codex"}}}}'
+  -d '{"properties": {"状态": {"select": {"name": "In Progress"}}, "负责人": {"select": {"name": "Codex"}}}}'
 ```
 
 ### 创建新任务
@@ -140,7 +140,7 @@ curl -s -X POST "https://api.notion.com/v1/pages" \
     "properties": {
       "Task ID": {"title": [{"text": {"content": "OT-XXX"}}]},
       "标题": {"rich_text": [{"text": {"content": "任务描述"}}]},
-      "状态": {"select": {"name": "待分配"}},
+      "状态": {"select": {"name": "Pending"}},
       "优先级": {"select": {"name": "P2 中"}},
       "项目": {"select": {"name": "openclaw-termux"}}
     }
@@ -158,13 +158,13 @@ curl -s -X POST "https://api.notion.com/v1/pages" \
 当前版本: vX.X.X
 
 任务统计:
-- 待分配: X
-- 进行中: X
-- 阻塞: X
-- 待审核: X
-- 本周完成: X
+- Pending: X
+- In Progress: X
+- Blocked: X
+- Review: X
+- 本周Done: X
 
-阻塞问题:
+Blocked问题:
 1. OT-XXX: <问题描述>
 
 需要决策:

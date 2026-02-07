@@ -10,7 +10,7 @@
 ## 📋 任务来源
 
 任务由 **小鸡 (Moltbot)** 从 Notion 任务看板分发。
-Notion 数据库 ID: `a3bfdc46-7fea-44a1-9f6d-cb17b6242998`
+Notion 数据库 ID: `300c3533-cc2f-812e-8789-ff7f8de1f31c`
 
 ---
 
