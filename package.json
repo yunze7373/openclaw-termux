@@ -1,7 +1,7 @@
 {
   "name": "moltbot",
   "version": "2026.1.27-beta.1",
-  "description": "WhatsApp gateway CLI (Baileys web) with Pi RPC agent",
+  "description": "OpenClaw Termux Fork - Personal AI assistant for Android",
   "type": "module",
   "main": "dist/index.js",
   "exports": {
@@ -284,5 +284,9 @@
       "apps/macos/.build/**",
       "dist/Moltbot.app/**"
     ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yunze7373/openclaw-termux.git"
   }
 }

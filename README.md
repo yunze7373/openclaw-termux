@@ -1,10 +1,10 @@
-# Moltbot Termux Fork
+# OpenClaw Termux Fork
 
 <p align="center">
-  <img src="./README-header.png" alt="Moltbot Termux Fork" width="720">
+  <img src="./README-header.png" alt="OpenClaw Termux Fork" width="720">
 </p>
 
-**Moltbot Termux Fork** is a Termux-optimized fork designed to run a personal AI assistant **natively on Android**.
+**OpenClaw Termux Fork** is a Termux-optimized fork designed to run a personal AI assistant **natively on Android**.
 
 - **Repo**: `yunze7373/openclaw-termux`
 - **Positioning**: Android/Termux compatibility branch + multi-node distributed runtime
