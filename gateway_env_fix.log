@@ -1,4 +1,0 @@
-2026-01-28T13:30:01.406Z Gateway failed to start: gateway already running (pid 18840); lock timeout after 5000ms
-If the gateway is supervised, stop it with: moltbot gateway stop
-2026-01-28T13:30:01.586Z Port 18789 is already in use.
-2026-01-28T13:30:01.596Z - Port is in use but process details are unavailable (install lsof or run as an admin user).

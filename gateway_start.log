@@ -1,5 +1,0 @@
-
-> moltbot@2026.1.27-beta.1 start /data/data/com.termux/files/home/clawdbot
-> node scripts/run-node.mjs gateway --port 18789
-
-[moltbot] Building TypeScript (dist is stale).
