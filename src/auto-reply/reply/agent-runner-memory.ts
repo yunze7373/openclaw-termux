@@ -1,4 +1,8 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import { resolveAgentModelFallbacksOverride } from "../../agents/agent-scope.js";
 import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { isCliProvider } from "../../agents/model-selection.js";
@@ -23,6 +27,27 @@ import {
 } from "./memory-flush.js";
 import type { FollowupRun } from "./queue.js";
 import { incrementCompactionCount } from "./session-updates.js";
+
+const execAsync = promisify(exec);
+
+async function checkAndArchiveMemoryMd(workspaceDir: string) {
+  try {
+    const memoryMdPath = path.join(workspaceDir, "MEMORY.md");
+    if (!fs.existsSync(memoryMdPath)) return;
+
+    const stats = fs.statSync(memoryMdPath);
+    if (stats.size > 25000) {
+      logVerbose(`MEMORY.md size ${stats.size} exceeds limit; triggering archival...`);
+      const archiverScript = "scripts/memory-archiver.sh";
+      if (fs.existsSync(archiverScript)) {
+        await execAsync(`AUTO_CONFIRM=true bash ${archiverScript} --force`);
+        logVerbose("MEMORY.md archival complete.");
+      }
+    }
+  } catch (err) {
+    logVerbose(`failed to check or archive MEMORY.md: ${String(err)}`);
+  }
+}
 
 export async function runMemoryFlushIfNeeded(params: {
   cfg: MoltbotConfig;
@@ -70,6 +95,11 @@ export async function runMemoryFlushIfNeeded(params: {
     });
 
   if (!shouldFlushMemory) return params.sessionEntry;
+
+  // Check and archive MEMORY.md if needed before running the flush turn
+  if (params.followupRun.run.workspaceDir) {
+    await checkAndArchiveMemoryMd(params.followupRun.run.workspaceDir);
+  }
 
   let activeSessionEntry = params.sessionEntry;
   const activeSessionStore = params.sessionStore;

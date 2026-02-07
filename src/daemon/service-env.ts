@@ -32,6 +32,9 @@ function resolveSystemPathDirs(platform: NodeJS.Platform): string[] {
   if (platform === "linux") {
     return ["/usr/local/bin", "/usr/bin", "/bin"];
   }
+  if (platform === "android") {
+    return ["/data/data/com.termux/files/usr/bin", "/system/bin"];
+  }
   return [];
 }
 
@@ -68,6 +71,7 @@ export function resolveLinuxUserBinDirs(
   dirs.push(`${home}/.local/bin`); // XDG standard, pip, etc.
   dirs.push(`${home}/.npm-global/bin`); // npm custom prefix (recommended for non-root)
   dirs.push(`${home}/bin`); // User's personal bin
+  dirs.push(`${home}/go/bin`); // Go bin
 
   // Node version managers
   dirs.push(`${home}/.nvm/current/bin`); // nvm with current symlink
@@ -88,9 +92,11 @@ export function getMinimalServicePathParts(options: MinimalServicePathOptions = 
   const extraDirs = options.extraDirs ?? [];
   const systemDirs = resolveSystemPathDirs(platform);
 
-  // Add Linux user bin directories (npm global, nvm, fnm, volta, etc.)
-  const linuxUserDirs =
-    platform === "linux" ? resolveLinuxUserBinDirs(options.home, options.env) : [];
+  // Add user bin directories (npm global, nvm, fnm, volta, etc.)
+  const userDirs =
+    (platform === "linux" || platform === "android")
+      ? resolveLinuxUserBinDirs(options.home, options.env)
+      : [];
 
   const add = (dir: string) => {
     if (!dir) return;
@@ -99,7 +105,7 @@ export function getMinimalServicePathParts(options: MinimalServicePathOptions = 
 
   for (const dir of extraDirs) add(dir);
   // User dirs first so user-installed binaries take precedence
-  for (const dir of linuxUserDirs) add(dir);
+  for (const dir of userDirs) add(dir);
   for (const dir of systemDirs) add(dir);
 
   return parts;

@@ -1,7 +1,7 @@
 ---
 name: session-logs
 description: Search and analyze your own session logs (older/parent conversations) using jq.
-metadata: {"moltbot":{"emoji":"📜","requires":{"bins":["jq","rg"]}}}
+metadata: {"moltbot":{"emoji":"📜","requires":{"bins":["jq","rg"]},"install":[{"id":"pkg-jq","kind":"pkg","package":"jq","label":"Install jq (pkg)"},{"id":"pkg-rg","kind":"pkg","package":"ripgrep","label":"Install ripgrep (pkg)"}]}}
 ---
 
 # session-logs

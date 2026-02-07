@@ -1,10 +1,32 @@
 import os from "node:os";
 import path from "node:path";
+import fs from "node:fs";
 
 import type { MoltbotConfig, MemorySearchConfig } from "../config/config.js";
 import { resolveStateDir } from "../config/paths.js";
 import { clampInt, clampNumber, resolveUserPath } from "../utils.js";
 import { resolveAgentConfig } from "./agent-scope.js";
+
+function parseEmbeddingConfig(content: string): { model: string; baseUrl: string; dimensions: number } | null {
+  const lines = content.split('\n');
+  let modelType = '';
+  let baseUrl = '';
+  let dimensions = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('EMBEDDING_MODEL=')) {
+      modelType = trimmed.split('=')[1].replace(/"/g, '');
+    } else if (trimmed.startsWith('OLLAMA_BASE_URL=')) {
+      baseUrl = trimmed.split('=')[1].replace(/"/g, '');
+    } else if (trimmed.startsWith('EMBEDDING_DIMENSIONS=')) {
+      dimensions = parseInt(trimmed.split('=')[1]);
+    }
+  }
+  if (modelType === 'local' && baseUrl) {
+    return { model: 'qwen3-embedding', baseUrl, dimensions };
+  }
+  return null;
+}
 
 export type ResolvedMemorySearchConfig = {
   enabled: boolean;
@@ -281,5 +303,23 @@ export function resolveMemorySearchConfig(
   const overrides = resolveAgentConfig(cfg, agentId)?.memorySearch;
   const resolved = mergeConfig(defaults, overrides, agentId);
   if (!resolved.enabled) return null;
+
+  // Read .embedding-config to override with local Ollama settings
+  const embeddingConfigPath = path.join(os.homedir(), '.embedding-config');
+  try {
+    const content = fs.readFileSync(embeddingConfigPath, 'utf8');
+    const embedding = parseEmbeddingConfig(content);
+    if (embedding) {
+      resolved.provider = 'local';
+      resolved.remote = {
+        ...resolved.remote,
+        baseUrl: embedding.baseUrl,
+      };
+      resolved.model = embedding.model;
+    }
+  } catch {
+    // Ignore if file not found or parse error
+  }
+
   return resolved;
 }

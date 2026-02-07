@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 import type { DatabaseSync } from "node:sqlite";
 import chokidar, { type FSWatcher } from "chokidar";
+
+const execFileAsync = promisify(execFile);
 
 import { resolveAgentDir, resolveAgentWorkspaceDir } from "../agents/agent-scope.js";
 import type { ResolvedMemorySearchConfig } from "../agents/memory-search.js";
@@ -192,6 +196,20 @@ export class MemoryIndexManager {
       fallback: settings.fallback,
       local: settings.local,
     });
+
+    if (process.env.USE_SUPABASE_MEMORY === "true") {
+      const { SupabaseMemoryManager } = await import("./manager-supabase.js");
+      // @ts-expect-error - Duck typing the interface for swap
+      return new SupabaseMemoryManager({
+        cacheKey: key,
+        cfg,
+        agentId,
+        workspaceDir,
+        settings,
+        providerResult,
+      });
+    }
+
     const manager = new MemoryIndexManager({
       cacheKey: key,
       cfg,
@@ -266,6 +284,33 @@ export class MemoryIndexManager {
       sessionKey?: string;
     },
   ): Promise<MemorySearchResult[]> {
+    // [MOD] External Provider Hook
+    if (process.env.MEMORY_PROVIDER_SCRIPT) {
+      try {
+        const scriptPath = process.env.MEMORY_PROVIDER_SCRIPT;
+        const limit = opts?.maxResults ?? this.settings.query.maxResults ?? 10;
+        // Call external script: ./script.sh search "query" --limit N
+        const { stdout } = await execFileAsync(scriptPath, ["search", query, "--limit", String(limit)]);
+        
+        // Parse JSON output (expecting array of results)
+        const rawResults = JSON.parse(stdout);
+        if (Array.isArray(rawResults)) {
+           // Map external results to MemorySearchResult
+           return rawResults.map((r: any) => ({
+             path: r.path || "external",
+             startLine: r.startLine || 1,
+             endLine: r.endLine || 1,
+             score: r.score || r.similarity || 1.0,
+             snippet: r.content || r.snippet || "",
+             source: "memory"
+           }));
+        }
+      } catch (err) {
+        log.warn(`External memory provider failed, falling back to local: ${String(err)}`);
+        // Fallthrough to local logic
+      }
+    }
+
     void this.warmSession(opts?.sessionKey);
     if (this.settings.sync.onSearch && (this.dirty || this.sessionsDirty)) {
       void this.sync({ reason: "search" }).catch((err) => {
@@ -585,11 +630,19 @@ export class MemoryIndexManager {
   private async ensureVectorReady(dimensions?: number): Promise<boolean> {
     if (!this.vector.enabled) return false;
     if (!this.vectorReady) {
+      // In Termux or other environments, loadVectorExtension might fail.
+      // We wrap it to ensure we don't crash, but just mark vector as unavailable.
       this.vectorReady = this.withTimeout(
-        this.loadVectorExtension(),
+        this.loadVectorExtension().catch((err) => {
+          log.warn(`sqlite-vec load failed (caught): ${String(err)}`);
+          return false;
+        }),
         VECTOR_LOAD_TIMEOUT_MS,
         `sqlite-vec load timed out after ${Math.round(VECTOR_LOAD_TIMEOUT_MS / 1000)}s`,
-      );
+      ).catch((err) => {
+          log.warn(`sqlite-vec ready check failed: ${String(err)}`);
+          return false;
+      });
     }
     let ready = false;
     try {
@@ -603,7 +656,13 @@ export class MemoryIndexManager {
       return false;
     }
     if (ready && typeof dimensions === "number" && dimensions > 0) {
-      this.ensureVectorTable(dimensions);
+      try {
+        this.ensureVectorTable(dimensions);
+      } catch (err) {
+         log.warn(`Failed to ensure vector table: ${String(err)}`);
+         this.vector.available = false;
+         return false;
+      }
     }
     return ready;
   }
@@ -619,7 +678,14 @@ export class MemoryIndexManager {
         ? resolveUserPath(this.vector.extensionPath)
         : undefined;
       const loaded = await loadSqliteVecExtension({ db: this.db, extensionPath: resolvedPath });
-      if (!loaded.ok) throw new Error(loaded.error ?? "unknown sqlite-vec load error");
+      if (!loaded.ok) {
+        // Log but do not throw, treating it as a graceful degradation
+        const msg = loaded.error ?? "unknown sqlite-vec load error";
+        log.warn(`sqlite-vec load failed: ${msg}`);
+        this.vector.available = false;
+        this.vector.loadError = msg;
+        return false;
+      }
       this.vector.extensionPath = loaded.extensionPath;
       this.vector.available = true;
       return true;
@@ -627,7 +693,7 @@ export class MemoryIndexManager {
       const message = err instanceof Error ? err.message : String(err);
       this.vector.available = false;
       this.vector.loadError = message;
-      log.warn(`sqlite-vec unavailable: ${message}`);
+      log.warn(`sqlite-vec unavailable (exception): ${message}`);
       return false;
     }
   }

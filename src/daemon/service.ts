@@ -151,5 +151,24 @@ export function resolveGatewayService(): GatewayService {
     };
   }
 
+  if (process.platform === "android") {
+    return {
+      label: "Manual (Android)",
+      loadedText: "active",
+      notLoadedText: "inactive",
+      install: async () => {
+        throw new Error(
+          "Automatic service installation is not supported on Android. Please run the gateway manually using 'moltbot gateway start'.",
+        );
+      },
+      uninstall: async () => {},
+      stop: async () => {},
+      restart: async () => {},
+      isLoaded: async () => false,
+      readCommand: async () => null,
+      readRuntime: async () => ({ status: "stopped", pid: undefined }),
+    };
+  }
+
   throw new Error(`Gateway service install not supported on ${process.platform}`);
 }

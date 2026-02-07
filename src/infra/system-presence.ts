@@ -1,5 +1,8 @@
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type SystemPresence = {
   host?: string;
@@ -56,10 +59,31 @@ function resolvePrimaryIPv4(): string | undefined {
   return pick(prefer) ?? os.hostname();
 }
 
+function resolvePackageVersion(): string {
+  if (process.env.CLAWDBOT_VERSION) return process.env.CLAWDBOT_VERSION;
+  if (process.env.npm_package_version) return process.env.npm_package_version;
+  try {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    // Try to find package.json by walking up
+    let current = __dirname;
+    for (let i = 0; i < 4; i++) {
+      const pkgPath = path.join(current, "package.json");
+      if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+        if (pkg.version) return pkg.version;
+      }
+      current = path.dirname(current);
+    }
+  } catch {
+    // ignore
+  }
+  return "unknown";
+}
+
 function initSelfPresence() {
   const host = os.hostname();
   const ip = resolvePrimaryIPv4() ?? undefined;
-  const version = process.env.CLAWDBOT_VERSION ?? process.env.npm_package_version ?? "unknown";
+  const version = resolvePackageVersion();
   const modelIdentifier = (() => {
     const p = os.platform();
     if (p === "darwin") {

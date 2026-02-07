@@ -78,7 +78,16 @@ import {
   saveExecApprovals,
   updateExecApprovalsFormValue,
 } from "./controllers/exec-approvals";
-import { loadCronRuns, toggleCronJob, runCronJob, removeCronJob, addCronJob } from "./controllers/cron";
+import {
+  loadCronRuns,
+  toggleCronJob,
+  runCronJob,
+  removeCronJob,
+  addCronJob,
+  editCronJob,
+  cancelEditCronJob,
+  updateCronJob,
+} from "./controllers/cron";
 import { loadDebug, callDebugMethod } from "./controllers/debug";
 import { loadLogs } from "./controllers/logs";
 
@@ -312,6 +321,7 @@ export function renderApp(state: AppViewState) {
               error: state.cronError,
               busy: state.cronBusy,
               form: state.cronForm,
+              editingId: state.cronEditingId,
               channels: state.channelsSnapshot?.channelMeta?.length
                 ? state.channelsSnapshot.channelMeta.map((entry) => entry.id)
                 : state.channelsSnapshot?.channelOrder ?? [],
@@ -322,6 +332,9 @@ export function renderApp(state: AppViewState) {
               onFormChange: (patch) => (state.cronForm = { ...state.cronForm, ...patch }),
               onRefresh: () => state.loadCron(),
               onAdd: () => addCronJob(state),
+              onEdit: (job) => editCronJob(state, job),
+              onCancelEdit: () => cancelEditCronJob(state),
+              onUpdate: () => updateCronJob(state),
               onToggle: (job, enabled) => toggleCronJob(state, job, enabled),
               onRun: (job) => runCronJob(state, job),
               onRemove: (job) => removeCronJob(state, job),
@@ -496,6 +509,9 @@ export function renderApp(state: AppViewState) {
               onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
               assistantName: state.assistantName,
               assistantAvatar: state.assistantAvatar,
+              modelProviders: state.modelProviders,
+              selectedModelId: state.selectedModelId,
+              onModelChange: (modelId: string) => state.handleModelChange(modelId),
             })
           : nothing}
 

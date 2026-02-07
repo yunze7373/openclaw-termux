@@ -63,7 +63,7 @@ function enqueueChatMessage(host: ChatHost, text: string, attachments?: ChatAtta
 }
 
 async function sendChatMessageNow(
-  host: ChatHost,
+  host: ChatHost & { selectedModelId?: string | null },
   message: string,
   opts?: {
     previousDraft?: string;
@@ -71,10 +71,11 @@ async function sendChatMessageNow(
     attachments?: ChatAttachment[];
     previousAttachments?: ChatAttachment[];
     restoreAttachments?: boolean;
+    modelId?: string | null;
   },
 ) {
   resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
-  const ok = await sendChatMessage(host as unknown as MoltbotApp, message, opts?.attachments);
+  const ok = await sendChatMessage(host as unknown as MoltbotApp, message, opts?.attachments, opts?.modelId);
   if (!ok && opts?.previousDraft != null) {
     host.chatMessage = opts.previousDraft;
   }
@@ -113,7 +114,7 @@ export function removeQueuedMessage(host: ChatHost, id: string) {
 }
 
 export async function handleSendChat(
-  host: ChatHost,
+  host: ChatHost & { selectedModelId?: string | null },
   messageOverride?: string,
   opts?: { restoreDraft?: boolean },
 ) {
@@ -149,6 +150,7 @@ export async function handleSendChat(
     attachments: hasAttachments ? attachmentsToSend : undefined,
     previousAttachments: messageOverride == null ? attachments : undefined,
     restoreAttachments: Boolean(messageOverride && opts?.restoreDraft),
+    modelId: host.selectedModelId,
   });
 }
 

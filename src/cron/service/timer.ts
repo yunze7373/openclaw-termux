@@ -59,6 +59,8 @@ export async function executeJob(
   nowMs: number,
   opts: { forced: boolean },
 ) {
+  if (!opts.forced && !job.enabled) return;
+
   const startedAt = state.deps.nowMs();
   job.state.runningAtMs = startedAt;
   job.state.lastError = undefined;
@@ -210,6 +212,8 @@ export async function executeJob(
     if (!opts.forced && job.enabled && !deleted) {
       // Keep nextRunAtMs in sync in case the schedule advanced during a long run.
       job.state.nextRunAtMs = computeJobNextRunAtMs(job, state.deps.nowMs());
+    } else {
+      job.state.nextRunAtMs = undefined;
     }
   }
 }

@@ -1,0 +1,15 @@
+[90m2026-01-28T11:27:18.325Z[39m [35m[canvas][39m [36mhost mounted at http://0.0.0.0:18789/__moltbot__/canvas/ (root /data/data/com.termux/files/home/clawd/canvas)[39m
+[90m2026-01-28T11:27:18.796Z[39m [36m[heartbeat][39m [36mstarted[39m
+[90m2026-01-28T11:27:18.839Z[39m [36m[gateway][39m [36magent model: anthropic/claude-opus-4-5[39m
+[90m2026-01-28T11:27:18.852Z[39m [36m[gateway][39m [36mlistening on ws://0.0.0.0:18789 (PID 15773)[39m
+[90m2026-01-28T11:27:18.864Z[39m [36m[gateway][39m [36mlog file: /data/data/com.termux/files/usr/tmp/moltbot/moltbot-2026-01-28.log[39m
+[90m2026-01-28T11:27:18.978Z[39m [35m[browser/service][39m [36mBrowser control service ready (profiles=2)[39m
+[90m2026-01-28T11:27:33.444Z[39m [36m[ws][39m [33munauthorized conn=d72ab0a6-22cc-4fcb-9ca3-85141c12957f remote=127.0.0.1 client=cli cli vdev reason=token_mismatch[39m
+[90m2026-01-28T11:27:33.516Z[39m [36m[ws][39m [33mclosed before connect conn=d72ab0a6-22cc-4fcb-9ca3-85141c12957f remote=127.0.0.1 fwd=n/a origin=n/a host=127.0.0.1:18789 ua=n/a code=1008 reason=connect failed[39m
+[90m2026-01-28T11:43:32.817Z[39m [36m[ws][39m [33mclosed before connect conn=a798fbc5-64d0-4874-9801-8b549dee3588 remote=192.168.31.200 fwd=n/a origin=http://192.168.31.155:18789 host=192.168.31.155:18789 ua=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 code=1008 reason=control ui requires HTTPS or localhost (secure context)[39m
+[90m2026-01-28T11:43:33.657Z[39m [36m[ws][39m [33mclosed before connect conn=7909d5a7-8215-41e6-a42f-a524b8e1af55 remote=192.168.31.200 fwd=n/a origin=http://192.168.31.155:18789 host=192.168.31.155:18789 ua=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 code=1008 reason=control ui requires HTTPS or localhost (secure context)[39m
+[90m2026-01-28T11:43:35.054Z[39m [36m[ws][39m [33mclosed before connect conn=15948850-b639-4c86-af45-4d82ba54a2ab remote=192.168.31.200 fwd=n/a origin=http://192.168.31.155:18789 host=192.168.31.155:18789 ua=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 code=1008 reason=control ui requires HTTPS or localhost (secure context)[39m
+[90m2026-01-28T11:43:37.435Z[39m [36m[ws][39m [33mclosed before connect conn=7adac232-9b92-4cac-b325-64f1882bc0e3 remote=192.168.31.200 fwd=n/a origin=http://192.168.31.155:18789 host=192.168.31.155:18789 ua=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 code=1008 reason=control ui requires HTTPS or localhost (secure context)[39m
+[90m2026-01-28T11:43:38.512Z[39m [36m[gateway][39m [36msignal SIGTERM received[39m
+[90m2026-01-28T11:43:38.516Z[39m [36m[gateway][39m [36mreceived SIGTERM; shutting down[39m
+[90m2026-01-28T11:43:38.534Z[39m [34m[gmail-watcher][39m [36mgmail watcher stopped[39m

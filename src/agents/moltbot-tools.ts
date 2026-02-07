@@ -18,6 +18,7 @@ import { createSessionsSendTool } from "./tools/sessions-send-tool.js";
 import { createSessionsSpawnTool } from "./tools/sessions-spawn-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 import { createTtsTool } from "./tools/tts-tool.js";
+import { createTermuxLocationTool } from "./tools/termux-tool.js";
 
 export function createMoltbotTools(options?: {
   sandboxBrowserBridgeUrl?: string;
@@ -137,6 +138,7 @@ export function createMoltbotTools(options?: {
     ...(webSearchTool ? [webSearchTool] : []),
     ...(webFetchTool ? [webFetchTool] : []),
     ...(imageTool ? [imageTool] : []),
+    ...(process.platform === "android" ? [createTermuxLocationTool()] : []),
   ];
 
   const pluginTools = resolvePluginTools({

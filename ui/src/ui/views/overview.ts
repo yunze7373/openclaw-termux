@@ -24,12 +24,11 @@ export type OverviewProps = {
 };
 
 export function renderOverview(props: OverviewProps) {
-  const snapshot = props.hello?.snapshot as
-    | { uptimeMs?: number; policy?: { tickIntervalMs?: number } }
-    | undefined;
+  const snapshot = props.hello?.snapshot as { uptimeMs?: number } | undefined;
+  const policy = props.hello?.policy;
   const uptime = snapshot?.uptimeMs ? formatDurationMs(snapshot.uptimeMs) : "n/a";
-  const tick = snapshot?.policy?.tickIntervalMs
-    ? `${snapshot.policy.tickIntervalMs}ms`
+  const tick = policy?.tickIntervalMs
+    ? `${policy.tickIntervalMs}ms`
     : "n/a";
   const authHint = (() => {
     if (props.connected || !props.lastError) return null;

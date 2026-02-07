@@ -1,7 +1,7 @@
 ---
 name: tmux
 description: Remote-control tmux sessions for interactive CLIs by sending keystrokes and scraping pane output.
-metadata: {"moltbot":{"emoji":"🧵","os":["darwin","linux"],"requires":{"bins":["tmux"]}}}
+metadata: {"moltbot":{"emoji":"🧵","os":["darwin","linux","android"],"requires":{"bins":["tmux"]},"install":[{"id":"pkg","kind":"pkg","package":"tmux","label":"Install tmux (pkg)"},{"id":"brew","kind":"brew","formula":"tmux","label":"Install tmux (brew)"}]}}
 ---
 
 # tmux Skill (Moltbot)

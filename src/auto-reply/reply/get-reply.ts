@@ -7,8 +7,10 @@ import { resolveModelRefFromString } from "../../agents/model-selection.js";
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 import { DEFAULT_AGENT_WORKSPACE_DIR, ensureAgentWorkspace } from "../../agents/workspace.js";
 import { type MoltbotConfig, loadConfig } from "../../config/config.js";
+import { updateSessionStore } from "../../config/sessions.js";
 import { defaultRuntime } from "../../runtime.js";
 import { resolveCommandAuthorization } from "../command-auth.js";
+import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
 import type { MsgContext } from "../templating.js";
 import { SILENT_REPLY_TOKEN } from "../tokens.js";
 import { applyMediaUnderstanding } from "../../media-understanding/apply.js";
@@ -46,7 +48,17 @@ export async function getReplyFromConfig(
   });
   let provider = defaultProvider;
   let model = defaultModel;
-  if (opts?.isHeartbeat) {
+  if (opts?.modelOverride) {
+    const overrideRef = resolveModelRefFromString({
+      raw: opts.modelOverride,
+      defaultProvider,
+      aliasIndex,
+    });
+    if (overrideRef) {
+      provider = overrideRef.ref.provider;
+      model = overrideRef.ref.model;
+    }
+  } else if (opts?.isHeartbeat) {
     const heartbeatRaw = agentCfg?.heartbeat?.model?.trim() ?? "";
     const heartbeatRef = heartbeatRaw
       ? resolveModelRefFromString({
@@ -126,6 +138,48 @@ export async function getReplyFromConfig(
     bodyStripped,
   } = sessionState;
 
+  const modelOverrideRequested = opts?.modelOverride !== undefined;
+  if (modelOverrideRequested && sessionEntry && sessionStore && sessionKey) {
+    const rawOverride = opts!.modelOverride?.trim() || "";
+    const overrideRef = rawOverride
+      ? resolveModelRefFromString({
+          raw: rawOverride,
+          defaultProvider,
+          aliasIndex,
+        })
+      : {
+          ref: { provider: defaultProvider, model: defaultModel },
+          isDefault: true,
+          alias: undefined,
+        };
+
+    if (overrideRef) {
+      const isDefault =
+        !rawOverride ||
+        (overrideRef.ref.provider === defaultProvider && overrideRef.ref.model === defaultModel);
+      const { updated } = applyModelOverrideToSessionEntry({
+        entry: sessionEntry,
+        selection: {
+          provider: overrideRef.ref.provider,
+          model: overrideRef.ref.model,
+          isDefault,
+        },
+      });
+      if (updated || modelOverrideRequested) {
+        provider = overrideRef.ref.provider;
+        model = overrideRef.ref.model;
+        sessionStore[sessionKey] = sessionEntry;
+        if (storePath) {
+          updateSessionStore(storePath, (store: Record<string, any>) => {
+            store[sessionKey] = sessionEntry;
+          }).catch(() => {
+            // Ignore persistence errors
+          });
+        }
+      }
+    }
+  }
+
   await applyResetModelOverride({
     cfg,
     resetTriggered,
@@ -166,6 +220,7 @@ export async function getReplyFromConfig(
     typing,
     opts,
     skillFilter: opts?.skillFilter,
+    ignoreStoredOverride: modelOverrideRequested,
   });
   if (directiveResult.kind === "reply") {
     return directiveResult.reply;

@@ -55,6 +55,7 @@ export async function sendChatMessage(
   state: ChatState,
   message: string,
   attachments?: ChatAttachment[],
+  modelId?: string | null,
 ): Promise<boolean> {
   if (!state.client || !state.connected) return false;
   const msg = message.trim();
@@ -116,6 +117,7 @@ export async function sendChatMessage(
       deliver: false,
       idempotencyKey: runId,
       attachments: apiAttachments,
+      model: modelId || undefined,
     });
     return true;
   } catch (err) {

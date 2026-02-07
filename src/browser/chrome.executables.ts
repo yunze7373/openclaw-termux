@@ -145,6 +145,7 @@ function detectDefaultChromiumExecutable(platform: NodeJS.Platform): BrowserExec
   if (platform === "darwin") return detectDefaultChromiumExecutableMac();
   if (platform === "linux") return detectDefaultChromiumExecutableLinux();
   if (platform === "win32") return detectDefaultChromiumExecutableWindows();
+  if (platform === "android") return detectDefaultChromiumExecutableAndroid();
   return null;
 }
 
@@ -365,6 +366,18 @@ function findFirstExecutable(candidates: Array<BrowserExecutable>): BrowserExecu
   return null;
 }
 
+function detectDefaultChromiumExecutableAndroid(): BrowserExecutable | null {
+  const candidates: Array<BrowserExecutable> = [
+    { kind: "chromium", path: "/data/data/com.termux/files/usr/bin/chromium-browser" },
+    { kind: "chromium", path: "/data/data/com.termux/files/usr/bin/chromium" },
+  ];
+  return findFirstExecutable(candidates);
+}
+
+export function findChromeExecutableAndroid(): BrowserExecutable | null {
+  return detectDefaultChromiumExecutableAndroid();
+}
+
 export function findChromeExecutableMac(): BrowserExecutable | null {
   const candidates: Array<BrowserExecutable> = [
     {
@@ -525,5 +538,6 @@ export function resolveBrowserExecutableForPlatform(
   if (platform === "darwin") return findChromeExecutableMac();
   if (platform === "linux") return findChromeExecutableLinux();
   if (platform === "win32") return findChromeExecutableWindows();
+  if (platform === "android") return findChromeExecutableAndroid();
   return null;
 }

@@ -2,7 +2,7 @@
 name: weather
 description: Get current weather and forecasts (no API key required).
 homepage: https://wttr.in/:help
-metadata: {"moltbot":{"emoji":"🌤️","requires":{"bins":["curl"]}}}
+metadata: {"moltbot":{"emoji":"🌤️","requires":{"bins":["curl"]},"install":[{"id":"pkg","kind":"pkg","package":"curl","label":"Install curl (pkg)"}]}}
 ---
 
 # Weather
@@ -31,6 +31,7 @@ curl -s "wttr.in/London?T"
 Format codes: `%c` condition · `%t` temp · `%h` humidity · `%w` wind · `%l` location · `%m` moon
 
 Tips:
+- Always use the full `curl` command (e.g. `curl -s ...`).
 - URL-encode spaces: `wttr.in/New+York`
 - Airport codes: `wttr.in/JFK`
 - Units: `?m` (metric) `?u` (USCS)

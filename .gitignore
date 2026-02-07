@@ -71,3 +71,6 @@ USER.md
 
 # local tooling
 .serena/
+
+.gemini/
+gha-creds-*.json

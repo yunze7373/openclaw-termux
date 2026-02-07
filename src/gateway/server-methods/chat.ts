@@ -318,6 +318,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       }>;
       timeoutMs?: number;
       idempotencyKey: string;
+      model?: string;
     };
     const stopCommand = isChatStopCommandText(p.message);
     const normalizedAttachments =
@@ -493,6 +494,7 @@ export const chatHandlers: GatewayRequestHandlers = {
           abortSignal: abortController.signal,
           images: parsedImages.length > 0 ? parsedImages : undefined,
           disableBlockStreaming: true,
+          modelOverride: p.model,
           onAgentRunStart: () => {
             agentRunStarted = true;
           },
@@ -555,6 +557,9 @@ export const chatHandlers: GatewayRequestHandlers = {
         })
         .catch((err) => {
           const error = errorShape(ErrorCodes.UNAVAILABLE, String(err));
+          // [MOD] Make errors loud in logs
+          console.error(`[Chat Error] Dispatch failed for session ${p.sessionKey}:`, err);
+          
           context.dedupe.set(`chat:${clientRunId}`, {
             ts: Date.now(),
             ok: false,
@@ -565,6 +570,18 @@ export const chatHandlers: GatewayRequestHandlers = {
             },
             error,
           });
+
+          // [MOD] Inject error message into transcript so user sees it in the UI
+          const { storePath: errStorePath, entry: errEntry } = loadSessionEntry(p.sessionKey);
+          const errSessionId = errEntry?.sessionId ?? entry?.sessionId ?? clientRunId;
+          appendAssistantTranscriptMessage({
+            message: `⚠️ **系统错误**: 模型调用失败。\n\n> ${String(err)}\n\n请检查配置或尝试切换模型。`,
+            sessionId: errSessionId,
+            storePath: errStorePath,
+            sessionFile: errEntry?.sessionFile,
+            createIfMissing: true,
+          });
+
           broadcastChatError({
             context,
             runId: clientRunId,

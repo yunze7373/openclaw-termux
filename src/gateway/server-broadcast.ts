@@ -26,7 +26,8 @@ function hasEventScope(client: GatewayWsClient, event: string): boolean {
 }
 
 export function createGatewayBroadcaster(params: { clients: Set<GatewayWsClient> }) {
-  let seq = 0;
+  const clientSeqs = new WeakMap<GatewayWsClient, number>();
+
   const broadcast = (
     event: string,
     payload: unknown,
@@ -35,17 +36,8 @@ export function createGatewayBroadcaster(params: { clients: Set<GatewayWsClient>
       stateVersion?: { presence?: number; health?: number };
     },
   ) => {
-    const eventSeq = ++seq;
-    const frame = JSON.stringify({
-      type: "event",
-      event,
-      payload,
-      seq: eventSeq,
-      stateVersion: opts?.stateVersion,
-    });
     const logMeta: Record<string, unknown> = {
       event,
-      seq: eventSeq,
       clients: params.clients.size,
       dropIfSlow: opts?.dropIfSlow,
       presenceVersion: opts?.stateVersion?.presence,
@@ -55,10 +47,23 @@ export function createGatewayBroadcaster(params: { clients: Set<GatewayWsClient>
       Object.assign(logMeta, summarizeAgentEventForWsLog(payload));
     }
     logWs("out", "event", logMeta);
+
     for (const c of params.clients) {
       if (!hasEventScope(c, event)) continue;
       const slow = c.socket.bufferedAmount > MAX_BUFFERED_BYTES;
       if (slow && opts?.dropIfSlow) continue;
+
+      const currentSeq = (clientSeqs.get(c) ?? 0) + 1;
+      clientSeqs.set(c, currentSeq);
+
+      const frame = JSON.stringify({
+        type: "event",
+        event,
+        payload,
+        seq: currentSeq,
+        stateVersion: opts?.stateVersion,
+      });
+
       if (slow) {
         try {
           c.socket.close(1008, "slow consumer");

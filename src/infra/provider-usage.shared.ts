@@ -11,6 +11,8 @@ export const PROVIDER_LABELS: Record<UsageProviderId, string> = {
   minimax: "MiniMax",
   "openai-codex": "Codex",
   zai: "z.ai",
+  deepseek: "DeepSeek",
+  moonshot: "Moonshot (Kimi)",
 };
 
 export const usageProviders: UsageProviderId[] = [
@@ -21,6 +23,8 @@ export const usageProviders: UsageProviderId[] = [
   "minimax",
   "openai-codex",
   "zai",
+  "deepseek",
+  "moonshot",
 ];
 
 export function resolveUsageProviderId(provider?: string | null): UsageProviderId | undefined {

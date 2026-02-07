@@ -106,6 +106,7 @@ export async function resolveReplyDirectives(params: {
   typing: TypingController;
   opts?: GetReplyOptions;
   skillFilter?: string[];
+  ignoreStoredOverride?: boolean;
 }): Promise<ReplyDirectiveResult> {
   const {
     ctx,
@@ -131,6 +132,7 @@ export async function resolveReplyDirectives(params: {
     typing,
     opts,
     skillFilter,
+    ignoreStoredOverride,
   } = params;
   let provider = initialProvider;
   let model = initialModel;
@@ -386,6 +388,7 @@ export async function resolveReplyDirectives(params: {
     provider,
     model,
     hasModelDirective: directives.hasModelDirective,
+    ignoreStoredOverride,
   });
   provider = modelState.provider;
   model = modelState.model;

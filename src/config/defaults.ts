@@ -1,4 +1,4 @@
-import { DEFAULT_CONTEXT_TOKENS } from "../agents/defaults.js";
+import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { parseModelRef } from "../agents/model-selection.js";
 import { resolveTalkApiKey } from "./talk.js";
 import type { MoltbotConfig } from "./types.js";
@@ -241,23 +241,45 @@ export function applyModelDefaults(cfg: MoltbotConfig): MoltbotConfig {
 export function applyAgentDefaults(cfg: MoltbotConfig): MoltbotConfig {
   const agents = cfg.agents;
   const defaults = agents?.defaults;
-  const hasMax =
-    typeof defaults?.maxConcurrent === "number" && Number.isFinite(defaults.maxConcurrent);
-  const hasSubMax =
-    typeof defaults?.subagents?.maxConcurrent === "number" &&
-    Number.isFinite(defaults.subagents.maxConcurrent);
-  if (hasMax && hasSubMax) return cfg;
-
   let mutated = false;
   const nextDefaults = defaults ? { ...defaults } : {};
-  if (!hasMax) {
+
+  if (typeof nextDefaults.maxConcurrent !== "number" || !Number.isFinite(nextDefaults.maxConcurrent)) {
     nextDefaults.maxConcurrent = DEFAULT_AGENT_MAX_CONCURRENT;
     mutated = true;
   }
 
-  const nextSubagents = defaults?.subagents ? { ...defaults.subagents } : {};
-  if (!hasSubMax) {
+  // Model defaults
+  if (!nextDefaults.model) {
+    nextDefaults.model = {
+      primary: `${DEFAULT_PROVIDER}/${DEFAULT_MODEL}`,
+      fallbacks: [],
+    };
+    mutated = true;
+  }
+
+  if (!nextDefaults.thinkingDefault) {
+    nextDefaults.thinkingDefault = "off";
+    mutated = true;
+  }
+
+  if (!nextDefaults.verboseDefault) {
+    nextDefaults.verboseDefault = "off";
+    mutated = true;
+  }
+
+  if (!nextDefaults.elevatedDefault) {
+    nextDefaults.elevatedDefault = "ask";
+    mutated = true;
+  }
+
+  const nextSubagents = nextDefaults.subagents ? { ...nextDefaults.subagents } : {};
+  if (typeof nextSubagents.maxConcurrent !== "number" || !Number.isFinite(nextSubagents.maxConcurrent)) {
     nextSubagents.maxConcurrent = DEFAULT_SUBAGENT_MAX_CONCURRENT;
+  }
+  
+  if (JSON.stringify(nextDefaults.subagents) !== JSON.stringify(nextSubagents)) {
+    nextDefaults.subagents = nextSubagents;
     mutated = true;
   }
 
@@ -267,10 +289,7 @@ export function applyAgentDefaults(cfg: MoltbotConfig): MoltbotConfig {
     ...cfg,
     agents: {
       ...agents,
-      defaults: {
-        ...nextDefaults,
-        subagents: nextSubagents,
-      },
+      defaults: nextDefaults,
     },
   };
 }

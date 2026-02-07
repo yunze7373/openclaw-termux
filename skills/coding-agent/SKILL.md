@@ -1,12 +1,27 @@
 ---
 name: coding-agent
-description: Run Codex CLI, Claude Code, OpenCode, or Pi Coding Agent via background process for programmatic control.
-metadata: {"moltbot":{"emoji":"🧩","requires":{"anyBins":["claude","codex","opencode","pi"]}}}
+description: Run Codex CLI, Claude Code, OpenCode, Gemini CLI, or Pi Coding Agent via background process for programmatic control.
+metadata: {"moltbot":{"emoji":"🧩","requires":{"anyBins":["claude","codex","opencode","pi","gemini"]}}}
 ---
 
 # Coding Agent (bash-first)
 
 Use **bash** (with optional background mode) for all coding agent work. Simple and effective.
+
+## ♊️ Gemini CLI (Simple & Fast)
+
+Gemini CLI is great for one-shot text generation, summaries, or structured data (JSON).
+
+```bash
+# Basic one-shot (auto-selects model)
+gemini "Refactor this function: $(cat src/main.js)"
+
+# Specify a model
+gemini --model gemini-2.0-flash "What's the best way to handle..."
+
+# Get JSON output
+gemini --output-format json "Extract todos from: $(cat notes.txt)"
+```
 
 ## ⚠️ PTY Mode Required!
 

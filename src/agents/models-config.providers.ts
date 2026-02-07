@@ -75,6 +75,16 @@ const OLLAMA_DEFAULT_COST = {
   cacheWrite: 0,
 };
 
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1";
+const DEEPSEEK_DEFAULT_CONTEXT_WINDOW = 64000;
+const DEEPSEEK_DEFAULT_MAX_TOKENS = 8192;
+const DEEPSEEK_DEFAULT_COST = {
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+};
+
 interface OllamaModel {
   name: string;
   modified_at: string;
@@ -341,6 +351,33 @@ function buildSyntheticProvider(): ProviderConfig {
   };
 }
 
+function buildDeepseekProvider(): ProviderConfig {
+  return {
+    baseUrl: DEEPSEEK_BASE_URL, // https://api.deepseek.com
+    api: "openai-completions",
+    models: [
+      {
+        id: "deepseek-chat",
+        name: "DeepSeek V3",
+        reasoning: false,
+        input: ["text"],
+        cost: DEEPSEEK_DEFAULT_COST,
+        contextWindow: 128000,
+        maxTokens: 8192,
+      },
+      {
+        id: "deepseek-reasoner",
+        name: "DeepSeek R1",
+        reasoning: true,
+        input: ["text"],
+        cost: DEEPSEEK_DEFAULT_COST,
+        contextWindow: 64000,
+        maxTokens: 8192,
+      },
+    ],
+  };
+}
+
 async function buildVeniceProvider(): Promise<ProviderConfig> {
   const models = await discoverVeniceModels();
   return {
@@ -400,6 +437,13 @@ export async function resolveImplicitProviders(params: {
     resolveApiKeyFromProfiles({ provider: "venice", store: authStore });
   if (veniceKey) {
     providers.venice = { ...(await buildVeniceProvider()), apiKey: veniceKey };
+  }
+
+  const deepseekKey =
+    resolveEnvApiKeyVarName("deepseek") ??
+    resolveApiKeyFromProfiles({ provider: "deepseek", store: authStore });
+  if (deepseekKey) {
+    providers.deepseek = { ...buildDeepseekProvider(), apiKey: deepseekKey };
   }
 
   const qwenProfiles = listProfilesForProvider(authStore, "qwen-portal");
@@ -475,6 +519,9 @@ export async function resolveImplicitCopilotProvider(params: {
   return {
     baseUrl,
     models: [],
+    headers: {
+      "Editor-Version": "vscode/1.96.2",
+    },
   } satisfies ProviderConfig;
 }
 

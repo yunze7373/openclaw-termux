@@ -7,6 +7,10 @@ import { ensureMoltbotModelsJson } from "./models-config.js";
 
 type ModelEntry = { id: string; contextWindow?: number };
 
+const STATIC_MODELS: Record<string, number> = {
+  "raptor-mini": 200_000,
+};
+
 const MODEL_CACHE = new Map<string, number>();
 const loadPromise = (async () => {
   try {
@@ -32,5 +36,5 @@ export function lookupContextTokens(modelId?: string): number | undefined {
   if (!modelId) return undefined;
   // Best-effort: kick off loading, but don't block.
   void loadPromise;
-  return MODEL_CACHE.get(modelId);
+  return MODEL_CACHE.get(modelId) ?? STATIC_MODELS[modelId];
 }

@@ -153,6 +153,9 @@ export function renderRuntimeHints(
 }
 
 export function renderGatewayServiceStartHints(env: NodeJS.ProcessEnv = process.env): string[] {
+  if (process.platform === "android") {
+    return [formatCliCommand("moltbot gateway", env)];
+  }
   const base = [
     formatCliCommand("moltbot gateway install", env),
     formatCliCommand("moltbot gateway", env),

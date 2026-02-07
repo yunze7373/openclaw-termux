@@ -17,6 +17,7 @@ export type CronProps = {
   error: string | null;
   busy: boolean;
   form: CronFormState;
+  editingId: string | null;
   channels: string[];
   channelLabels?: Record<string, string>;
   channelMeta?: ChannelUiMetaEntry[];
@@ -25,6 +26,9 @@ export type CronProps = {
   onFormChange: (patch: Partial<CronFormState>) => void;
   onRefresh: () => void;
   onAdd: () => void;
+  onEdit: (job: CronJob) => void;
+  onCancelEdit: () => void;
+  onUpdate: () => void;
   onToggle: (job: CronJob, enabled: boolean) => void;
   onRun: (job: CronJob) => void;
   onRemove: (job: CronJob) => void;
@@ -88,7 +92,7 @@ export function renderCron(props: CronProps) {
       </div>
 
       <div class="card">
-        <div class="card-title">New Job</div>
+        <div class="card-title">${props.editingId ? "Edit Job" : "New Job"}</div>
         <div class="card-sub">Create a scheduled wakeup or agent run.</div>
         <div class="form-grid" style="margin-top: 16px;">
           <label class="field">
@@ -261,9 +265,24 @@ export function renderCron(props: CronProps) {
             `
           : nothing}
         <div class="row" style="margin-top: 14px;">
-          <button class="btn primary" ?disabled=${props.busy} @click=${props.onAdd}>
-            ${props.busy ? "Saving…" : "Add job"}
+          <button
+            class="btn primary"
+            ?disabled=${props.busy}
+            @click=${props.editingId ? props.onUpdate : props.onAdd}
+          >
+            ${props.busy ? "Saving…" : props.editingId ? "Save changes" : "Add job"}
           </button>
+          ${props.editingId
+            ? html`
+                <button
+                  class="btn"
+                  ?disabled=${props.busy}
+                  @click=${props.onCancelEdit}
+                >
+                  Cancel
+                </button>
+              `
+            : nothing}
         </div>
       </div>
     </section>
@@ -387,7 +406,17 @@ function renderJob(job: CronJob, props: CronProps) {
       </div>
       <div class="list-meta">
         <div>${formatCronState(job)}</div>
-        <div class="row" style="justify-content: flex-end; margin-top: 8px;">
+        <div class="row" style="justify-content: flex-end; margin-top: 8px; flex-wrap: wrap;">
+          <button
+            class="btn"
+            ?disabled=${props.busy}
+            @click=${(event: Event) => {
+              event.stopPropagation();
+              props.onEdit(job);
+            }}
+          >
+            Edit
+          </button>
           <button
             class="btn"
             ?disabled=${props.busy}

@@ -1,0 +1,149 @@
+[90m2026-01-28T11:45:31.725Z[39m [35m[canvas][39m [36mhost mounted at http://0.0.0.0:18789/__moltbot__/canvas/ (root /data/data/com.termux/files/home/clawd/canvas)[39m
+[90m2026-01-28T11:45:31.863Z[39m [36m[heartbeat][39m [36mstarted[39m
+[90m2026-01-28T11:45:31.871Z[39m [36m[gateway][39m [36magent model: anthropic/claude-opus-4-5[39m
+[90m2026-01-28T11:45:31.875Z[39m [36m[gateway][39m [36mlistening on ws://0.0.0.0:18789 (PID 16788)[39m
+[90m2026-01-28T11:45:31.879Z[39m [36m[gateway][39m [36mlog file: /data/data/com.termux/files/usr/tmp/moltbot/moltbot-2026-01-28.log[39m
+[90m2026-01-28T11:45:31.939Z[39m [35m[browser/service][39m [36mBrowser control service ready (profiles=2)[39m
+[90m2026-01-28T11:45:34.987Z[39m [36m[ws][39m [36mwebchat connected conn=0459a209-32f5-4f57-b860-fa1671c8c56a remote=192.168.31.200 client=moltbot-control-ui webchat vdev[39m
+[90m2026-01-28T11:45:43.443Z[39m [36m[ws][39m [33munauthorized conn=5523d177-bb68-40b5-8d8a-750153a856d3 remote=127.0.0.1 client=cli cli vdev reason=token_mismatch[39m
+[90m2026-01-28T11:45:43.498Z[39m [36m[ws][39m [33mclosed before connect conn=5523d177-bb68-40b5-8d8a-750153a856d3 remote=127.0.0.1 fwd=n/a origin=n/a host=127.0.0.1:18789 ua=n/a code=1008 reason=connect failed[39m
+[90m2026-01-28T11:55:41.522Z[39m [36m[ws][39m [36m⇄ res ✓ config.schema 185ms conn=0459a209…c56a id=f4c73a02…b126[39m
+[90m2026-01-28T11:55:45.269Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.start 2ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=77763c16…b69f[39m
+[90m2026-01-28T11:55:46.543Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.start 1ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=ffb92146…e4db[39m
+[90m2026-01-28T11:55:47.559Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.start 1ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=5681ec8b…d97d[39m
+[90m2026-01-28T11:56:17.122Z[39m [36m[ws][39m [36m⇄ res ✓ config.schema 72ms conn=0459a209…c56a id=1ae1f72e…0ecb[39m
+[90m2026-01-28T11:57:00.065Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 255ms conn=0459a209…c56a id=41467434…4910[39m
+[90m2026-01-28T11:57:01.679Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 189ms conn=0459a209…c56a id=2479cc64…ab2c[39m
+[90m2026-01-28T11:57:37.448Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.start 1ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=6c94b84f…5eb9[39m
+[90m2026-01-28T11:57:38.468Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.start 0ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=3253d368…a0ab[39m
+[90m2026-01-28T11:57:39.174Z[39m [36m[ws][39m [36m⇄ res ✗ channels.logout 2ms errorCode=INVALID_REQUEST errorMessage=invalid channels.logout channel conn=0459a209…c56a id=6bbf5ea7…809d[39m
+[90m2026-01-28T11:57:40.074Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.wait 1ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=8bd53a24…603e[39m
+[90m2026-01-28T11:57:40.626Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.start 0ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=d606cf8a…b84c[39m
+[90m2026-01-28T11:57:41.016Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.start 1ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=fa98ce8b…095c[39m
+[90m2026-01-28T11:57:42.047Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.wait 1ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=f91226e8…ba6e[39m
+[90m2026-01-28T11:57:42.294Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.start 0ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=9517dfc0…62dc[39m
+[90m2026-01-28T11:57:42.762Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.start 0ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=978ddb7e…0b27[39m
+[90m2026-01-28T11:57:50.610Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.wait 0ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=1882342a…9826[39m
+[90m2026-01-28T11:57:51.500Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.wait 0ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=0adb9ff8…0cb1[39m
+[90m2026-01-28T11:57:52.588Z[39m [36m[ws][39m [36m⇄ res ✗ web.login.start 0ms errorCode=INVALID_REQUEST errorMessage=web login provider is not available conn=0459a209…c56a id=10c19921…fe6e[39m
+[90m2026-01-28T11:58:15.598Z[39m [31m[diagnostic][39m [31mlane task error: lane=main durationMs=8 error="Error: No API key found for provider "anthropic". Auth store: /data/data/com.termux/files/home/.clawdbot/agents/main/agent/auth-profiles.json (agentDir: /data/data/com.termux/files/home/.clawdbot/agents/main/agent). Configure auth for this agent (moltbot agents add <id>) or copy auth-profiles.json from the main agentDir."[39m
+[90m2026-01-28T11:58:15.600Z[39m [31m[diagnostic][39m [31mlane task error: lane=session:agent:main:main durationMs=17 error="Error: No API key found for provider "anthropic". Auth store: /data/data/com.termux/files/home/.clawdbot/agents/main/agent/auth-profiles.json (agentDir: /data/data/com.termux/files/home/.clawdbot/agents/main/agent). Configure auth for this agent (moltbot agents add <id>) or copy auth-profiles.json from the main agentDir."[39m
+2026-01-28T11:58:15.605Z Embedded agent failed before reply: No API key found for provider "anthropic". Auth store: /data/data/com.termux/files/home/.clawdbot/agents/main/agent/auth-profiles.json (agentDir: /data/data/com.termux/files/home/.clawdbot/agents/main/agent). Configure auth for this agent (moltbot agents add <id>) or copy auth-profiles.json from the main agentDir.
+[90m2026-01-28T11:58:28.644Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 151ms conn=0459a209…c56a id=6ae9507a…7703[39m
+[90m2026-01-28T11:58:30.231Z[39m [36m[ws][39m [36m⇄ res ✓ config.schema 68ms conn=0459a209…c56a id=6860dea1…357e[39m
+[90m2026-01-28T11:58:54.317Z[39m [36m[ws][39m [36m⇄ res ✓ update.run 409ms conn=0459a209…c56a id=7fc8d6de…e90f[39m
+[90m2026-01-28T11:58:56.318Z[39m [36m[gateway][39m [36msignal SIGUSR1 received[39m
+[90m2026-01-28T11:58:56.322Z[39m [36m[gateway][39m [36mreceived SIGUSR1; restarting[39m
+[90m2026-01-28T11:58:56.338Z[39m [34m[gmail-watcher][39m [36mgmail watcher stopped[39m
+[90m2026-01-28T11:58:57.195Z[39m [36m[ws][39m [36mwebchat disconnected code=1012 reason=service restart conn=0459a209-32f5-4f57-b860-fa1671c8c56a[39m
+[90m2026-01-28T11:58:57.234Z[39m [35m[canvas][39m [36mhost mounted at http://0.0.0.0:18789/__moltbot__/canvas/ (root /data/data/com.termux/files/home/clawd/canvas)[39m
+[90m2026-01-28T11:58:57.254Z[39m [36m[heartbeat][39m [36mstarted[39m
+[90m2026-01-28T11:58:57.261Z[39m [36m[gateway][39m [36magent model: anthropic/claude-opus-4-5[39m
+[90m2026-01-28T11:58:57.267Z[39m [36m[gateway][39m [36mlistening on ws://0.0.0.0:18789 (PID 16788)[39m
+[90m2026-01-28T11:58:57.274Z[39m [36m[gateway][39m [36mlog file: /data/data/com.termux/files/usr/tmp/moltbot/moltbot-2026-01-28.log[39m
+[90m2026-01-28T11:58:57.308Z[39m [35m[browser/service][39m [36mBrowser control service ready (profiles=2)[39m
+[90m2026-01-28T11:58:58.069Z[39m [36m[ws][39m [36mwebchat connected conn=d74666dc-fc82-4b98-9e4b-c55b81113616 remote=192.168.31.200 client=moltbot-control-ui webchat vdev[39m
+[90m2026-01-28T11:59:03.800Z[39m [36m[ws][39m [36m⇄ res ✓ update.run 429ms conn=d74666dc…3616 id=3acf364f…2285[39m
+[90m2026-01-28T11:59:05.799Z[39m [36m[gateway][39m [36msignal SIGUSR1 received[39m
+[90m2026-01-28T11:59:05.803Z[39m [36m[gateway][39m [36mreceived SIGUSR1; restarting[39m
+[90m2026-01-28T11:59:05.810Z[39m [34m[gmail-watcher][39m [36mgmail watcher stopped[39m
+[90m2026-01-28T11:59:05.832Z[39m [36m[ws][39m [36mwebchat disconnected code=1012 reason=service restart conn=d74666dc-fc82-4b98-9e4b-c55b81113616[39m
+[90m2026-01-28T11:59:05.864Z[39m [35m[canvas][39m [36mhost mounted at http://0.0.0.0:18789/__moltbot__/canvas/ (root /data/data/com.termux/files/home/clawd/canvas)[39m
+[90m2026-01-28T11:59:05.879Z[39m [36m[heartbeat][39m [36mstarted[39m
+[90m2026-01-28T11:59:05.883Z[39m [36m[gateway][39m [36magent model: anthropic/claude-opus-4-5[39m
+[90m2026-01-28T11:59:05.889Z[39m [36m[gateway][39m [36mlistening on ws://0.0.0.0:18789 (PID 16788)[39m
+[90m2026-01-28T11:59:05.895Z[39m [36m[gateway][39m [36mlog file: /data/data/com.termux/files/usr/tmp/moltbot/moltbot-2026-01-28.log[39m
+[90m2026-01-28T11:59:05.904Z[39m [35m[browser/service][39m [36mBrowser control service ready (profiles=2)[39m
+[90m2026-01-28T11:59:06.735Z[39m [36m[ws][39m [36mwebchat connected conn=58991381-0d1a-4a1d-9290-6f2dd5cc3e6b remote=192.168.31.200 client=moltbot-control-ui webchat vdev[39m
+[90m2026-01-28T11:59:06.828Z[39m [36m[ws][39m [36m⇄ res ✓ node.list 66ms conn=58991381…3e6b id=d3ef3d1a…6428[39m
+[90m2026-01-28T11:59:06.832Z[39m [36m[ws][39m [36m⇄ res ✓ device.pair.list 69ms conn=58991381…3e6b id=0f963a73…dbe6[39m
+[90m2026-01-28T11:59:14.791Z[39m [34m[reload][39m [36mconfig change detected; evaluating reload (meta.lastTouchedAt, update)[39m
+[90m2026-01-28T11:59:14.797Z[39m [34m[reload][39m [33mconfig change requires gateway restart (meta.lastTouchedAt, update)[39m
+[90m2026-01-28T11:59:14.800Z[39m [36m[gateway][39m [36msignal SIGUSR1 received[39m
+[90m2026-01-28T11:59:14.804Z[39m [36m[gateway][39m [36mreceived SIGUSR1; restarting[39m
+[90m2026-01-28T11:59:14.812Z[39m [34m[gmail-watcher][39m [36mgmail watcher stopped[39m
+[90m2026-01-28T11:59:14.827Z[39m [36m[ws][39m [36mwebchat disconnected code=1012 reason=service restart conn=58991381-0d1a-4a1d-9290-6f2dd5cc3e6b[39m
+[90m2026-01-28T11:59:14.849Z[39m [35m[canvas][39m [36mhost mounted at http://0.0.0.0:18789/__moltbot__/canvas/ (root /data/data/com.termux/files/home/clawd/canvas)[39m
+[90m2026-01-28T11:59:14.866Z[39m [36m[heartbeat][39m [36mstarted[39m
+[90m2026-01-28T11:59:14.870Z[39m [36m[gateway][39m [36magent model: anthropic/claude-opus-4-5[39m
+[90m2026-01-28T11:59:14.873Z[39m [36m[gateway][39m [36mlistening on ws://0.0.0.0:18789 (PID 16788)[39m
+[90m2026-01-28T11:59:14.878Z[39m [36m[gateway][39m [36mlog file: /data/data/com.termux/files/usr/tmp/moltbot/moltbot-2026-01-28.log[39m
+[90m2026-01-28T11:59:14.885Z[39m [35m[browser/service][39m [36mBrowser control service ready (profiles=2)[39m
+[90m2026-01-28T11:59:15.679Z[39m [36m[ws][39m [36mwebchat connected conn=b839d62f-1b7a-4da0-97d2-c0d6bb35383c remote=192.168.31.200 client=moltbot-control-ui webchat vdev[39m
+[90m2026-01-28T11:59:15.761Z[39m [36m[ws][39m [36m⇄ res ✓ node.list 50ms conn=b839d62f…383c id=5a439726…9697[39m
+[90m2026-01-28T11:59:15.766Z[39m [36m[ws][39m [36m⇄ res ✓ device.pair.list 55ms conn=b839d62f…383c id=7f48675e…0d3f[39m
+[90m2026-01-28T11:59:50.431Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 180ms conn=b839d62f…383c id=7551a448…157c[39m
+[90m2026-01-28T12:01:11.958Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 120ms conn=b839d62f…383c id=6b6b85c4…67ae[39m
+[90m2026-01-28T12:01:12.393Z[39m [34m[reload][39m [36mconfig change detected; evaluating reload (meta.lastTouchedAt, skills.entries)[39m
+[90m2026-01-28T12:01:12.397Z[39m [34m[reload][39m [33mconfig change requires gateway restart (meta.lastTouchedAt)[39m
+[90m2026-01-28T12:01:12.400Z[39m [36m[gateway][39m [36msignal SIGUSR1 received[39m
+[90m2026-01-28T12:01:12.403Z[39m [36m[gateway][39m [36mreceived SIGUSR1; restarting[39m
+[90m2026-01-28T12:01:12.413Z[39m [34m[gmail-watcher][39m [36mgmail watcher stopped[39m
+[90m2026-01-28T12:01:12.426Z[39m [36m[ws][39m [36mwebchat disconnected code=1012 reason=service restart conn=b839d62f-1b7a-4da0-97d2-c0d6bb35383c[39m
+[90m2026-01-28T12:01:12.447Z[39m [35m[canvas][39m [36mhost mounted at http://0.0.0.0:18789/__moltbot__/canvas/ (root /data/data/com.termux/files/home/clawd/canvas)[39m
+[90m2026-01-28T12:01:12.460Z[39m [36m[heartbeat][39m [36mstarted[39m
+[90m2026-01-28T12:01:12.464Z[39m [36m[gateway][39m [36magent model: anthropic/claude-opus-4-5[39m
+[90m2026-01-28T12:01:12.468Z[39m [36m[gateway][39m [36mlistening on ws://0.0.0.0:18789 (PID 16788)[39m
+[90m2026-01-28T12:01:12.472Z[39m [36m[gateway][39m [36mlog file: /data/data/com.termux/files/usr/tmp/moltbot/moltbot-2026-01-28.log[39m
+[90m2026-01-28T12:01:12.481Z[39m [35m[browser/service][39m [36mBrowser control service ready (profiles=2)[39m
+[90m2026-01-28T12:01:13.285Z[39m [36m[ws][39m [36mwebchat connected conn=2d532612-bca2-4f9d-aaaa-445101af457a remote=192.168.31.200 client=moltbot-control-ui webchat vdev[39m
+[90m2026-01-28T12:01:13.575Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 205ms conn=2d532612…457a id=dca1f36f…a813[39m
+[90m2026-01-28T12:01:13.593Z[39m [36m[ws][39m [36m⇄ res ✓ node.list 258ms conn=2d532612…457a id=af5837dc…9ed1[39m
+[90m2026-01-28T12:01:13.598Z[39m [36m[ws][39m [36m⇄ res ✓ device.pair.list 262ms conn=2d532612…457a id=abd0d3f9…2191[39m
+[90m2026-01-28T12:01:17.204Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 121ms conn=2d532612…457a id=37a424f6…374b[39m
+[90m2026-01-28T12:01:17.643Z[39m [34m[reload][39m [36mconfig change detected; evaluating reload (meta.lastTouchedAt)[39m
+[90m2026-01-28T12:01:17.647Z[39m [34m[reload][39m [33mconfig change requires gateway restart (meta.lastTouchedAt)[39m
+[90m2026-01-28T12:01:17.650Z[39m [36m[gateway][39m [36msignal SIGUSR1 received[39m
+[90m2026-01-28T12:01:17.653Z[39m [36m[gateway][39m [36mreceived SIGUSR1; restarting[39m
+[90m2026-01-28T12:01:17.661Z[39m [34m[gmail-watcher][39m [36mgmail watcher stopped[39m
+[90m2026-01-28T12:01:17.672Z[39m [36m[ws][39m [36mwebchat disconnected code=1012 reason=service restart conn=2d532612-bca2-4f9d-aaaa-445101af457a[39m
+[90m2026-01-28T12:01:17.688Z[39m [35m[canvas][39m [36mhost mounted at http://0.0.0.0:18789/__moltbot__/canvas/ (root /data/data/com.termux/files/home/clawd/canvas)[39m
+[90m2026-01-28T12:01:17.698Z[39m [36m[heartbeat][39m [36mstarted[39m
+[90m2026-01-28T12:01:17.702Z[39m [36m[gateway][39m [36magent model: anthropic/claude-opus-4-5[39m
+[90m2026-01-28T12:01:17.705Z[39m [36m[gateway][39m [36mlistening on ws://0.0.0.0:18789 (PID 16788)[39m
+[90m2026-01-28T12:01:17.709Z[39m [36m[gateway][39m [36mlog file: /data/data/com.termux/files/usr/tmp/moltbot/moltbot-2026-01-28.log[39m
+[90m2026-01-28T12:01:17.717Z[39m [35m[browser/service][39m [36mBrowser control service ready (profiles=2)[39m
+[90m2026-01-28T12:01:18.526Z[39m [36m[ws][39m [36mwebchat connected conn=fbb53dac-3952-4492-8281-de96fcc176a6 remote=192.168.31.200 client=moltbot-control-ui webchat vdev[39m
+[90m2026-01-28T12:01:18.667Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 109ms conn=fbb53dac…76a6 id=e1f73da5…a5a5[39m
+[90m2026-01-28T12:01:18.681Z[39m [36m[ws][39m [36m⇄ res ✓ node.list 124ms conn=fbb53dac…76a6 id=3833445f…e3da[39m
+[90m2026-01-28T12:01:18.684Z[39m [36m[ws][39m [36m⇄ res ✓ device.pair.list 128ms conn=fbb53dac…76a6 id=214ee5da…ea47[39m
+[90m2026-01-28T12:01:19.667Z[39m [36m[ws][39m [36m⇄ res ✗ skills.install 107ms errorCode=UNAVAILABLE errorMessage=brew not installed conn=fbb53dac…76a6 id=21280990…57e0[39m
+[90m2026-01-28T12:01:20.737Z[39m [36m[ws][39m [36m⇄ res ✗ skills.install 127ms errorCode=UNAVAILABLE errorMessage=brew not installed conn=fbb53dac…76a6 id=a272e059…4168[39m
+[90m2026-01-28T12:01:21.388Z[39m [36m[ws][39m [36m⇄ res ✗ skills.install 110ms errorCode=UNAVAILABLE errorMessage=brew not installed conn=fbb53dac…76a6 id=57b1911f…7afd[39m
+[90m2026-01-28T12:01:23.347Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 125ms conn=fbb53dac…76a6 id=ecfe5716…a787[39m
+[90m2026-01-28T12:01:23.794Z[39m [34m[reload][39m [36mconfig change detected; evaluating reload (meta.lastTouchedAt)[39m
+[90m2026-01-28T12:01:23.797Z[39m [34m[reload][39m [33mconfig change requires gateway restart (meta.lastTouchedAt)[39m
+[90m2026-01-28T12:01:23.801Z[39m [36m[gateway][39m [36msignal SIGUSR1 received[39m
+[90m2026-01-28T12:01:23.804Z[39m [36m[gateway][39m [36mreceived SIGUSR1; restarting[39m
+[90m2026-01-28T12:01:23.811Z[39m [34m[gmail-watcher][39m [36mgmail watcher stopped[39m
+[90m2026-01-28T12:01:23.841Z[39m [36m[ws][39m [36mwebchat disconnected code=1012 reason=service restart conn=fbb53dac-3952-4492-8281-de96fcc176a6[39m
+[90m2026-01-28T12:01:23.860Z[39m [35m[canvas][39m [36mhost mounted at http://0.0.0.0:18789/__moltbot__/canvas/ (root /data/data/com.termux/files/home/clawd/canvas)[39m
+[90m2026-01-28T12:01:23.870Z[39m [36m[heartbeat][39m [36mstarted[39m
+[90m2026-01-28T12:01:23.873Z[39m [36m[gateway][39m [36magent model: anthropic/claude-opus-4-5[39m
+[90m2026-01-28T12:01:23.877Z[39m [36m[gateway][39m [36mlistening on ws://0.0.0.0:18789 (PID 16788)[39m
+[90m2026-01-28T12:01:23.881Z[39m [36m[gateway][39m [36mlog file: /data/data/com.termux/files/usr/tmp/moltbot/moltbot-2026-01-28.log[39m
+[90m2026-01-28T12:01:23.888Z[39m [35m[browser/service][39m [36mBrowser control service ready (profiles=2)[39m
+[90m2026-01-28T12:01:24.690Z[39m [36m[ws][39m [36mwebchat connected conn=4e66b1b0-4ecc-4d0d-91e9-0903a4a9cae3 remote=192.168.31.200 client=moltbot-control-ui webchat vdev[39m
+[90m2026-01-28T12:01:24.909Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 157ms conn=4e66b1b0…cae3 id=967aa8cc…6f0e[39m
+[90m2026-01-28T12:01:24.924Z[39m [36m[ws][39m [36m⇄ res ✓ node.list 188ms conn=4e66b1b0…cae3 id=1df43f6c…a953[39m
+[90m2026-01-28T12:01:24.928Z[39m [36m[ws][39m [36m⇄ res ✓ device.pair.list 191ms conn=4e66b1b0…cae3 id=f269e4a8…c02b[39m
+[90m2026-01-28T12:01:57.370Z[39m [31m[diagnostic][39m [31mlane task error: lane=main durationMs=3 error="Error: No API key found for provider "anthropic". Auth store: /data/data/com.termux/files/home/.clawdbot/agents/main/agent/auth-profiles.json (agentDir: /data/data/com.termux/files/home/.clawdbot/agents/main/agent). Configure auth for this agent (moltbot agents add <id>) or copy auth-profiles.json from the main agentDir."[39m
+[90m2026-01-28T12:01:57.373Z[39m [31m[diagnostic][39m [31mlane task error: lane=session:agent:main:main durationMs=15 error="Error: No API key found for provider "anthropic". Auth store: /data/data/com.termux/files/home/.clawdbot/agents/main/agent/auth-profiles.json (agentDir: /data/data/com.termux/files/home/.clawdbot/agents/main/agent). Configure auth for this agent (moltbot agents add <id>) or copy auth-profiles.json from the main agentDir."[39m
+2026-01-28T12:01:57.377Z Embedded agent failed before reply: No API key found for provider "anthropic". Auth store: /data/data/com.termux/files/home/.clawdbot/agents/main/agent/auth-profiles.json (agentDir: /data/data/com.termux/files/home/.clawdbot/agents/main/agent). Configure auth for this agent (moltbot agents add <id>) or copy auth-profiles.json from the main agentDir.
+[90m2026-01-28T12:02:04.659Z[39m [34m[reload][39m [36mconfig change detected; evaluating reload (meta.lastTouchedAt, plugins)[39m
+[90m2026-01-28T12:02:04.663Z[39m [34m[reload][39m [33mconfig change requires gateway restart (meta.lastTouchedAt, plugins)[39m
+[90m2026-01-28T12:02:04.668Z[39m [36m[gateway][39m [36msignal SIGUSR1 received[39m
+[90m2026-01-28T12:02:04.678Z[39m [36m[gateway][39m [36mreceived SIGUSR1; restarting[39m
+[90m2026-01-28T12:02:04.688Z[39m [34m[gmail-watcher][39m [36mgmail watcher stopped[39m
+[90m2026-01-28T12:02:04.700Z[39m [36m[ws][39m [36mwebchat disconnected code=1012 reason=service restart conn=4e66b1b0-4ecc-4d0d-91e9-0903a4a9cae3[39m
+[90m2026-01-28T12:02:05.988Z[39m [35m[canvas][39m [36mhost mounted at http://0.0.0.0:18789/__moltbot__/canvas/ (root /data/data/com.termux/files/home/clawd/canvas)[39m
+[90m2026-01-28T12:02:06.030Z[39m [36m[heartbeat][39m [36mstarted[39m
+[90m2026-01-28T12:02:06.036Z[39m [36m[gateway][39m [36magent model: anthropic/claude-opus-4-5[39m
+[90m2026-01-28T12:02:06.042Z[39m [36m[gateway][39m [36mlistening on ws://0.0.0.0:18789 (PID 16788)[39m
+[90m2026-01-28T12:02:06.048Z[39m [36m[gateway][39m [36mlog file: /data/data/com.termux/files/usr/tmp/moltbot/moltbot-2026-01-28.log[39m
+[90m2026-01-28T12:02:06.059Z[39m [35m[browser/service][39m [36mBrowser control service ready (profiles=2)[39m
+[90m2026-01-28T12:02:06.104Z[39m [36m[ws][39m [36mwebchat connected conn=fa2f0596-a861-4395-8b98-78691da506ae remote=192.168.31.200 client=moltbot-control-ui webchat vdev[39m
+[90m2026-01-28T12:02:18.598Z[39m [36m[gateway][39m [36msignal SIGTERM received[39m
+[90m2026-01-28T12:02:18.602Z[39m [36m[gateway][39m [36mreceived SIGTERM; shutting down[39m
+[90m2026-01-28T12:02:18.635Z[39m [34m[gmail-watcher][39m [36mgmail watcher stopped[39m
+[90m2026-01-28T12:02:18.651Z[39m [36m[ws][39m [36mwebchat disconnected code=1012 reason=service restart conn=fa2f0596-a861-4395-8b98-78691da506ae[39m

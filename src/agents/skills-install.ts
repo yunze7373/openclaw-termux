@@ -82,15 +82,21 @@ function findInstallSpec(entry: SkillEntry, installId: string): SkillInstallSpec
 }
 
 function buildNodeInstallCommand(packageName: string, prefs: SkillsInstallPreferences): string[] {
+  const isAndroid = process.platform === "android" || process.env.TERMUX_VERSION !== undefined;
+  const npm = isAndroid ? "/data/data/com.termux/files/usr/bin/npm" : "npm";
+  const pnpm = isAndroid ? "/data/data/com.termux/files/usr/bin/pnpm" : "pnpm";
+  const yarn = isAndroid ? "/data/data/com.termux/files/usr/bin/yarn" : "yarn";
+  const bun = isAndroid ? "/data/data/com.termux/files/usr/bin/bun" : "bun";
+
   switch (prefs.nodeManager) {
     case "pnpm":
-      return ["pnpm", "add", "-g", packageName];
+      return [pnpm, "add", "-g", packageName];
     case "yarn":
-      return ["yarn", "global", "add", packageName];
+      return [yarn, "global", "add", packageName];
     case "bun":
-      return ["bun", "add", "-g", packageName];
+      return [bun, "add", "-g", packageName];
     default:
-      return ["npm", "install", "-g", packageName];
+      return [npm, "install", "-g", packageName];
   }
 }
 
@@ -101,9 +107,66 @@ function buildInstallCommand(
   argv: string[] | null;
   error?: string;
 } {
+  const isAndroid = process.platform === "android" || process.env.TERMUX_VERSION !== undefined;
   switch (spec.kind) {
     case "brew": {
       if (!spec.formula) return { argv: null, error: "missing brew formula" };
+      if (isAndroid) {
+        // Simple mapping for common packages
+        // Strip tap prefix (e.g. user/repo/formula -> formula)
+        let pkgName = spec.formula.split("/").pop() ?? spec.formula;
+        
+        // Android/Termux: Redirect specific brew formulas to go install
+        if (pkgName === "gifgrep") {
+          return { argv: ["go", "install", "github.com/steipete/gifgrep/cmd/gifgrep@latest"] };
+        }
+        if (pkgName === "gogcli" || pkgName === "gog") {
+          return { argv: ["go", "install", "github.com/steipete/gogcli/cmd/gog@latest"] };
+        }
+        if (pkgName === "goplaces") {
+          return { argv: ["go", "install", "github.com/steipete/goplaces/cmd/goplaces@latest"] };
+        }
+        if (pkgName === "camsnap") {
+          return { argv: ["go", "install", "github.com/steipete/camsnap/cmd/camsnap@latest"] };
+        }
+        if (pkgName === "openhue-cli" || pkgName === "openhue") {
+          return { argv: ["go", "install", "github.com/openhue/openhue-cli@latest"] };
+        }
+        if (pkgName === "ordercli") {
+          return { argv: ["go", "install", "github.com/steipete/ordercli/cmd/ordercli@latest"] };
+        }
+        if (pkgName === "sag") {
+          return { argv: ["go", "install", "github.com/steipete/sag@latest"] };
+        }
+        if (pkgName === "songsee") {
+          return { argv: ["go", "install", "github.com/steipete/songsee/cmd/songsee@latest"] };
+        }
+        if (pkgName === "spogo") {
+          return { argv: ["go", "install", "github.com/steipete/spogo@latest"] };
+        }
+        if (pkgName === "wacli") {
+          return { argv: ["go", "install", "github.com/steipete/wacli/cmd/wacli@latest"] };
+        }
+
+        // Blocklist for known unavailable packages on Android/Termux
+        const unavailable = [
+          "1password-cli", "imsg", 
+          "peekaboo",
+          "obsidian-cli", "himalaya", "opencode", "opencode-cli"
+        ];
+        if (unavailable.includes(pkgName)) {
+           let msg = `Skipped: '${pkgName}' is not available on Android/Termux`;
+           if (pkgName.includes("opencode")) msg += " (see anomalyco/opencode for manual install)";
+           return { argv: null, error: msg };
+        }
+
+        if (pkgName === "go") pkgName = "golang";
+        if (pkgName === "remindctl") pkgName = "remind";
+        if (pkgName === "openai-whisper") {
+           return { argv: ["uv", "tool", "install", "openai-whisper"] };
+        }
+        return { argv: ["/data/data/com.termux/files/usr/bin/pkg", "install", pkgName] };
+      }
       return { argv: ["brew", "install", spec.formula] };
     }
     case "node": {
@@ -343,7 +406,9 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
   }
 
   const brewExe = hasBinary("brew") ? "brew" : resolveBrewExecutable();
-  if (spec.kind === "brew" && !brewExe) {
+  const isAndroid = process.platform === "android" || process.env.TERMUX_VERSION !== undefined;
+
+  if (spec.kind === "brew" && !brewExe && !isAndroid) {
     return {
       ok: false,
       message: "brew not installed",
@@ -353,7 +418,22 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
     };
   }
   if (spec.kind === "uv" && !hasBinary("uv")) {
-    if (brewExe) {
+    if (isAndroid) {
+       // Try installing uv via pkg
+       const pkgResult = await runCommandWithTimeout(
+         ["/data/data/com.termux/files/usr/bin/pkg", "install", "uv"],
+         { timeoutMs, env: { ANDROID_API_LEVEL: "33" } }
+       );
+       if (pkgResult.code !== 0) {
+          return {
+            ok: false,
+            message: "Failed to install uv (pkg)",
+            stdout: pkgResult.stdout.trim(),
+            stderr: pkgResult.stderr.trim(),
+            code: pkgResult.code,
+          };
+       }
+    } else if (brewExe) {
       const brewResult = await runCommandWithTimeout([brewExe, "install", "uv"], {
         timeoutMs,
       });
@@ -391,7 +471,21 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
   }
 
   if (spec.kind === "go" && !hasBinary("go")) {
-    if (brewExe) {
+    if (isAndroid) {
+       const pkgResult = await runCommandWithTimeout(
+         ["/data/data/com.termux/files/usr/bin/pkg", "install", "golang"],
+         { timeoutMs, env: { ANDROID_API_LEVEL: "33" } }
+       );
+       if (pkgResult.code !== 0) {
+          return {
+            ok: false,
+            message: "Failed to install go (pkg)",
+            stdout: pkgResult.stdout.trim(),
+            stderr: pkgResult.stderr.trim(),
+            code: pkgResult.code,
+          };
+       }
+    } else if (brewExe) {
       const brewResult = await runCommandWithTimeout([brewExe, "install", "go"], {
         timeoutMs,
       });
@@ -416,9 +510,12 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
   }
 
   let env: NodeJS.ProcessEnv | undefined;
+  if (isAndroid) {
+    env = { ANDROID_API_LEVEL: "33" };
+  }
   if (spec.kind === "go" && brewExe) {
     const brewBin = await resolveBrewBinDir(timeoutMs, brewExe);
-    if (brewBin) env = { GOBIN: brewBin };
+    if (brewBin) env = { ...env, GOBIN: brewBin };
   }
 
   const result = await (async () => {
