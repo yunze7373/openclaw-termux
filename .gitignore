@@ -113,3 +113,10 @@ memory/
 # --- 缓存 ---
 .cache/
 .clawdhub/cache/
+
+# Personal workspace files (contains private info)
+/AGENTS.md
+/CODEX.md
+/GEMINI.md
+/XIAOJI.md
+/PROJECT-CONTEXT.md
