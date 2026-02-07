@@ -1,4 +1,4 @@
-import { pathKey, schemaType, type JsonSchema } from "./config-form.shared";
+import { pathKey, schemaType, type JsonSchema } from "./config-form.shared.ts";
 
 export type ConfigSchemaAnalysis = {
   schema: JsonSchema | null;
@@ -41,27 +41,27 @@ function normalizeSchemaNode(
 
   if (schema.anyOf || schema.oneOf || schema.allOf) {
     const union = normalizeUnion(schema, path);
-    if (union) return union;
+    if (union) {
+      return union;
+    }
     return { schema, unsupportedPaths: [pathLabel] };
   }
 
   const nullable = Array.isArray(schema.type) && schema.type.includes("null");
-  let type =
-    schemaType(schema) ??
-    (schema.properties || schema.additionalProperties ? "object" : undefined);
-
-  if (!type && isAnySchema(schema)) {
-    type = "string";
-  }
-
+  const type =
+    schemaType(schema) ?? (schema.properties || schema.additionalProperties ? "object" : undefined);
   normalized.type = type ?? schema.type;
   normalized.nullable = nullable || schema.nullable;
 
   if (normalized.enum) {
     const { enumValues, nullable: enumNullable } = normalizeEnum(normalized.enum);
     normalized.enum = enumValues;
-    if (enumNullable) normalized.nullable = true;
-    if (enumValues.length === 0) unsupported.add(pathLabel);
+    if (enumNullable) {
+      normalized.nullable = true;
+    }
+    if (enumValues.length === 0) {
+      unsupported.add(pathLabel);
+    }
   }
 
   if (type === "object") {
@@ -69,37 +69,38 @@ function normalizeSchemaNode(
     const normalizedProps: Record<string, JsonSchema> = {};
     for (const [key, value] of Object.entries(properties)) {
       const res = normalizeSchemaNode(value, [...path, key]);
-      if (res.schema) normalizedProps[key] = res.schema;
-      for (const entry of res.unsupportedPaths) unsupported.add(entry);
+      if (res.schema) {
+        normalizedProps[key] = res.schema;
+      }
+      for (const entry of res.unsupportedPaths) {
+        unsupported.add(entry);
+      }
     }
     normalized.properties = normalizedProps;
 
-    if (schema.additionalProperties === false) {
+    if (schema.additionalProperties === true) {
+      unsupported.add(pathLabel);
+    } else if (schema.additionalProperties === false) {
       normalized.additionalProperties = false;
-    } else if (
-      schema.additionalProperties &&
-      typeof schema.additionalProperties === "object"
-    ) {
-      if (!isAnySchema(schema.additionalProperties as JsonSchema)) {
-        const res = normalizeSchemaNode(
-          schema.additionalProperties as JsonSchema,
-          [...path, "*"],
-        );
-        normalized.additionalProperties =
-          res.schema ?? (schema.additionalProperties as JsonSchema);
-        for (const entry of res.unsupportedPaths) unsupported.add(entry);
+    } else if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
+      if (!isAnySchema(schema.additionalProperties)) {
+        const res = normalizeSchemaNode(schema.additionalProperties, [...path, "*"]);
+        normalized.additionalProperties = res.schema ?? schema.additionalProperties;
+        if (res.unsupportedPaths.length > 0) {
+          unsupported.add(pathLabel);
+        }
       }
     }
   } else if (type === "array") {
-    const itemsSchema = Array.isArray(schema.items)
-      ? schema.items[0]
-      : schema.items;
+    const itemsSchema = Array.isArray(schema.items) ? schema.items[0] : schema.items;
     if (!itemsSchema) {
       unsupported.add(pathLabel);
     } else {
-      const res = normalizeSchemaNode(itemsSchema, [...path]);
+      const res = normalizeSchemaNode(itemsSchema, [...path, "*"]);
       normalized.items = res.schema ?? itemsSchema;
-      for (const entry of res.unsupportedPaths) unsupported.add(entry);
+      if (res.unsupportedPaths.length > 0) {
+        unsupported.add(pathLabel);
+      }
     }
   } else if (
     type !== "string" &&
@@ -121,19 +122,28 @@ function normalizeUnion(
   schema: JsonSchema,
   path: Array<string | number>,
 ): ConfigSchemaAnalysis | null {
-  const union = schema.anyOf ?? schema.oneOf ?? schema.allOf;
-  if (!union) return null;
+  if (schema.allOf) {
+    return null;
+  }
+  const union = schema.anyOf ?? schema.oneOf;
+  if (!union) {
+    return null;
+  }
 
   const literals: unknown[] = [];
   const remaining: JsonSchema[] = [];
   let nullable = false;
 
   for (const entry of union) {
-    if (!entry || typeof entry !== "object") continue;
+    if (!entry || typeof entry !== "object") {
+      return null;
+    }
     if (Array.isArray(entry.enum)) {
       const { enumValues, nullable: enumNullable } = normalizeEnum(entry.enum);
       literals.push(...enumValues);
-      if (enumNullable) nullable = true;
+      if (enumNullable) {
+        nullable = true;
+      }
       continue;
     }
     if ("const" in entry) {
@@ -179,11 +189,11 @@ function normalizeUnion(
     return res;
   }
 
-  const primitiveTypes = ["string", "number", "integer", "boolean"];
+  const primitiveTypes = new Set(["string", "number", "integer", "boolean"]);
   if (
     remaining.length > 0 &&
     literals.length === 0 &&
-    remaining.every((entry) => entry.type && primitiveTypes.includes(String(entry.type)))
+    remaining.every((entry) => entry.type && primitiveTypes.has(String(entry.type)))
   ) {
     return {
       schema: {
@@ -191,47 +201,6 @@ function normalizeUnion(
         nullable,
       },
       unsupportedPaths: [],
-    };
-  }
-
-  // Handle allOf by merging or picking the most descriptive one
-  if (schema.allOf) {
-    // For UI purposes, we often just want the most specific object
-    const objects = remaining.filter((r) => schemaType(r) === "object" || r.properties);
-    if (objects.length > 0) {
-      const res = normalizeSchemaNode(objects[objects.length - 1], path);
-      return res;
-    }
-    // Also handle primitives (e.g. string with transform might be allOf)
-    const primitives = remaining.filter((r) => {
-      const t = schemaType(r);
-      return t && ["string", "number", "integer", "boolean"].includes(t);
-    });
-    if (primitives.length > 0) {
-      const res = normalizeSchemaNode(primitives[primitives.length - 1], path);
-      return res;
-    }
-  }
-
-  // Allow complex unions (e.g. objects) to pass through.
-  // The renderer will handle them (e.g. via a variant selector).
-  if (remaining.length > 1) {
-    // Normalize children
-    const unsupported: string[] = [];
-    const normalizedRemaining: JsonSchema[] = [];
-    for (const [idx, child] of remaining.entries()) {
-      const res = normalizeSchemaNode(child, [...path, `union-${idx}`]);
-      if (res.schema) normalizedRemaining.push(res.schema);
-      unsupported.push(...res.unsupportedPaths);
-    }
-    return {
-      schema: {
-        ...schema,
-        anyOf: undefined,
-        oneOf: normalizedRemaining,
-        nullable,
-      },
-      unsupportedPaths: unsupported, // Only bubble up if children are unsupported
     };
   }
 

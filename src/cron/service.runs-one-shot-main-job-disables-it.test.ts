@@ -1,9 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { HeartbeatRunResult } from "../infra/heartbeat-wake.js";
 import type { CronJob } from "./types.js";
 import { CronService } from "./service.js";
@@ -16,7 +14,7 @@ const noopLogger = {
 };
 
 async function makeStorePath() {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "moltbot-cron-"));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-cron-"));
   return {
     storePath: path.join(dir, "cron", "jobs.json"),
     cleanup: async () => {
@@ -51,7 +49,7 @@ describe("CronService", () => {
     vi.useRealTimers();
   });
 
-  it("runs a one-shot main job and disables it after success", async () => {
+  it("runs a one-shot main job and disables it after success when requested", async () => {
     const store = await makeStorePath();
     const enqueueSystemEvent = vi.fn();
     const requestHeartbeatNow = vi.fn();
@@ -70,7 +68,8 @@ describe("CronService", () => {
     const job = await cron.add({
       name: "one-shot hello",
       enabled: true,
-      schedule: { kind: "at", atMs },
+      deleteAfterRun: false,
+      schedule: { kind: "at", at: new Date(atMs).toISOString() },
       sessionTarget: "main",
       wakeMode: "now",
       payload: { kind: "systemEvent", text: "hello" },
@@ -96,7 +95,7 @@ describe("CronService", () => {
     await store.cleanup();
   });
 
-  it("runs a one-shot job and deletes it after success when requested", async () => {
+  it("runs a one-shot job and deletes it after success by default", async () => {
     const store = await makeStorePath();
     const enqueueSystemEvent = vi.fn();
     const requestHeartbeatNow = vi.fn();
@@ -115,8 +114,7 @@ describe("CronService", () => {
     const job = await cron.add({
       name: "one-shot delete",
       enabled: true,
-      deleteAfterRun: true,
-      schedule: { kind: "at", atMs },
+      schedule: { kind: "at", at: new Date(atMs).toISOString() },
       sessionTarget: "main",
       wakeMode: "now",
       payload: { kind: "systemEvent", text: "hello" },
@@ -170,7 +168,7 @@ describe("CronService", () => {
     const job = await cron.add({
       name: "wakeMode now waits",
       enabled: true,
-      schedule: { kind: "at", atMs: 1 },
+      schedule: { kind: "at", at: new Date(1).toISOString() },
       sessionTarget: "main",
       wakeMode: "now",
       payload: { kind: "systemEvent", text: "hello" },
@@ -178,7 +176,9 @@ describe("CronService", () => {
 
     const runPromise = cron.run(job.id, "force");
     for (let i = 0; i < 10; i++) {
-      if (runHeartbeatOnce.mock.calls.length > 0) break;
+      if (runHeartbeatOnce.mock.calls.length > 0) {
+        break;
+      }
       // Let the locked() chain progress.
       await Promise.resolve();
     }
@@ -266,10 +266,11 @@ describe("CronService", () => {
     await cron.add({
       enabled: true,
       name: "weekly",
-      schedule: { kind: "at", atMs },
+      schedule: { kind: "at", at: new Date(atMs).toISOString() },
       sessionTarget: "isolated",
       wakeMode: "now",
-      payload: { kind: "agentTurn", message: "do it", deliver: false },
+      payload: { kind: "agentTurn", message: "do it" },
+      delivery: { mode: "announce" },
     });
 
     vi.setSystemTime(new Date("2025-12-13T00:00:01.000Z"));
@@ -328,9 +329,12 @@ describe("CronService", () => {
     await cron.start();
     const jobs = await cron.list({ includeDisabled: true });
     const job = jobs.find((j) => j.id === rawJob.id);
+    // Legacy delivery fields are migrated to the top-level delivery object
+    const delivery = job?.delivery as unknown as Record<string, unknown>;
+    expect(delivery?.channel).toBe("telegram");
     const payload = job?.payload as unknown as Record<string, unknown>;
-    expect(payload.channel).toBe("telegram");
     expect("provider" in payload).toBe(false);
+    expect("channel" in payload).toBe(false);
 
     cron.stop();
     await store.cleanup();
@@ -379,8 +383,9 @@ describe("CronService", () => {
     await cron.start();
     const jobs = await cron.list({ includeDisabled: true });
     const job = jobs.find((j) => j.id === rawJob.id);
-    const payload = job?.payload as unknown as Record<string, unknown>;
-    expect(payload.channel).toBe("telegram");
+    // Legacy delivery fields are migrated to the top-level delivery object
+    const delivery = job?.delivery as unknown as Record<string, unknown>;
+    expect(delivery?.channel).toBe("telegram");
 
     cron.stop();
     await store.cleanup();
@@ -410,10 +415,11 @@ describe("CronService", () => {
     await cron.add({
       name: "isolated error test",
       enabled: true,
-      schedule: { kind: "at", atMs },
+      schedule: { kind: "at", at: new Date(atMs).toISOString() },
       sessionTarget: "isolated",
       wakeMode: "now",
-      payload: { kind: "agentTurn", message: "do it", deliver: false },
+      payload: { kind: "agentTurn", message: "do it" },
+      delivery: { mode: "announce" },
     });
 
     vi.setSystemTime(new Date("2025-12-13T00:00:01.000Z"));
@@ -485,7 +491,7 @@ describe("CronService", () => {
             enabled: true,
             createdAtMs: Date.parse("2025-12-13T00:00:00.000Z"),
             updatedAtMs: Date.parse("2025-12-13T00:00:00.000Z"),
-            schedule: { kind: "at", atMs },
+            schedule: { kind: "at", at: new Date(atMs).toISOString() },
             sessionTarget: "main",
             wakeMode: "now",
             payload: { kind: "agentTurn", message: "bad" },

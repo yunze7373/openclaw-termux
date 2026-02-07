@@ -1,10 +1,10 @@
-import type { GatewayBrowserClient } from "../gateway.js";
+import type { GatewayBrowserClient } from "../gateway.ts";
 import type {
   AgentFileEntry,
   AgentsFilesGetResult,
   AgentsFilesListResult,
   AgentsFilesSetResult,
-} from "../types.js";
+} from "../types.ts";
 
 export type AgentFilesState = {
   client: GatewayBrowserClient | null;

@@ -6,7 +6,7 @@ import type { ThemeMode } from "./theme.ts";
 import type { SessionsListResult } from "./types.ts";
 import { refreshChat } from "./app-chat.ts";
 import { syncUrlWithSessionKey } from "./app-settings.ts";
-import { MoltbotApp } from "./app.ts";
+import { OpenClawApp } from "./app.ts";
 import { ChatState, loadChatHistory } from "./controllers/chat.ts";
 import { icons } from "./icons.ts";
 import { iconForTab, pathForTab, titleForTab, type Tab } from "./navigation.ts";
@@ -95,10 +95,10 @@ export function renderChatControls(state: AppViewState) {
             state.sessionKey = next;
             state.chatMessage = "";
             state.chatStream = null;
-            (state as unknown as MoltbotApp).chatStreamStartedAt = null;
+            (state as unknown as OpenClawApp).chatStreamStartedAt = null;
             state.chatRunId = null;
-            (state as unknown as MoltbotApp).resetToolStream();
-            (state as unknown as MoltbotApp).resetChatScroll();
+            (state as unknown as OpenClawApp).resetToolStream();
+            (state as unknown as OpenClawApp).resetChatScroll();
             state.applySettings({
               ...state.settings,
               sessionKey: next,
@@ -127,7 +127,7 @@ export function renderChatControls(state: AppViewState) {
         class="btn btn--sm btn--icon"
         ?disabled=${state.chatLoading || !state.connected}
         @click=${() => {
-          (state as unknown as MoltbotApp).resetToolStream();
+          (state as unknown as OpenClawApp).resetToolStream();
           void refreshChat(state as unknown as Parameters<typeof refreshChat>[0]);
         }}
         title="Refresh chat data"

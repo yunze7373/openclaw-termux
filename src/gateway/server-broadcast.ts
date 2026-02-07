@@ -17,28 +17,46 @@ const EVENT_SCOPE_GUARDS: Record<string, string[]> = {
 
 function hasEventScope(client: GatewayWsClient, event: string): boolean {
   const required = EVENT_SCOPE_GUARDS[event];
-  if (!required) return true;
+  if (!required) {
+    return true;
+  }
   const role = client.connect.role ?? "operator";
-  if (role !== "operator") return false;
+  if (role !== "operator") {
+    return false;
+  }
   const scopes = Array.isArray(client.connect.scopes) ? client.connect.scopes : [];
-  if (scopes.includes(ADMIN_SCOPE)) return true;
+  if (scopes.includes(ADMIN_SCOPE)) {
+    return true;
+  }
   return required.some((scope) => scopes.includes(scope));
 }
 
 export function createGatewayBroadcaster(params: { clients: Set<GatewayWsClient> }) {
-  const clientSeqs = new WeakMap<GatewayWsClient, number>();
+  let seq = 0;
 
-  const broadcast = (
+  const broadcastInternal = (
     event: string,
     payload: unknown,
     opts?: {
       dropIfSlow?: boolean;
       stateVersion?: { presence?: number; health?: number };
     },
+    targetConnIds?: ReadonlySet<string>,
   ) => {
+    const isTargeted = Boolean(targetConnIds);
+    const eventSeq = isTargeted ? undefined : ++seq;
+    const frame = JSON.stringify({
+      type: "event",
+      event,
+      payload,
+      seq: eventSeq,
+      stateVersion: opts?.stateVersion,
+    });
     const logMeta: Record<string, unknown> = {
       event,
+      seq: eventSeq ?? "targeted",
       clients: params.clients.size,
+      targets: targetConnIds ? targetConnIds.size : undefined,
       dropIfSlow: opts?.dropIfSlow,
       presenceVersion: opts?.stateVersion?.presence,
       healthVersion: opts?.stateVersion?.health,
@@ -47,23 +65,17 @@ export function createGatewayBroadcaster(params: { clients: Set<GatewayWsClient>
       Object.assign(logMeta, summarizeAgentEventForWsLog(payload));
     }
     logWs("out", "event", logMeta);
-
     for (const c of params.clients) {
-      if (!hasEventScope(c, event)) continue;
+      if (targetConnIds && !targetConnIds.has(c.connId)) {
+        continue;
+      }
+      if (!hasEventScope(c, event)) {
+        continue;
+      }
       const slow = c.socket.bufferedAmount > MAX_BUFFERED_BYTES;
-      if (slow && opts?.dropIfSlow) continue;
-
-      const currentSeq = (clientSeqs.get(c) ?? 0) + 1;
-      clientSeqs.set(c, currentSeq);
-
-      const frame = JSON.stringify({
-        type: "event",
-        event,
-        payload,
-        seq: currentSeq,
-        stateVersion: opts?.stateVersion,
-      });
-
+      if (slow && opts?.dropIfSlow) {
+        continue;
+      }
       if (slow) {
         try {
           c.socket.close(1008, "slow consumer");
@@ -79,5 +91,30 @@ export function createGatewayBroadcaster(params: { clients: Set<GatewayWsClient>
       }
     }
   };
-  return { broadcast };
+
+  const broadcast = (
+    event: string,
+    payload: unknown,
+    opts?: {
+      dropIfSlow?: boolean;
+      stateVersion?: { presence?: number; health?: number };
+    },
+  ) => broadcastInternal(event, payload, opts);
+
+  const broadcastToConnIds = (
+    event: string,
+    payload: unknown,
+    connIds: ReadonlySet<string>,
+    opts?: {
+      dropIfSlow?: boolean;
+      stateVersion?: { presence?: number; health?: number };
+    },
+  ) => {
+    if (connIds.size === 0) {
+      return;
+    }
+    broadcastInternal(event, payload, opts, connIds);
+  };
+
+  return { broadcast, broadcastToConnIds };
 }

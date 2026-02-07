@@ -1,37 +1,15 @@
 import os from "node:os";
 import path from "node:path";
-import fs from "node:fs";
-
-import type { MoltbotConfig, MemorySearchConfig } from "../config/config.js";
+import type { OpenClawConfig, MemorySearchConfig } from "../config/config.js";
 import { resolveStateDir } from "../config/paths.js";
 import { clampInt, clampNumber, resolveUserPath } from "../utils.js";
 import { resolveAgentConfig } from "./agent-scope.js";
 
-function parseEmbeddingConfig(content: string): { model: string; baseUrl: string; dimensions: number } | null {
-  const lines = content.split('\n');
-  let modelType = '';
-  let baseUrl = '';
-  let dimensions = 0;
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('EMBEDDING_MODEL=')) {
-      modelType = trimmed.split('=')[1].replace(/"/g, '');
-    } else if (trimmed.startsWith('OLLAMA_BASE_URL=')) {
-      baseUrl = trimmed.split('=')[1].replace(/"/g, '');
-    } else if (trimmed.startsWith('EMBEDDING_DIMENSIONS=')) {
-      dimensions = parseInt(trimmed.split('=')[1]);
-    }
-  }
-  if (modelType === 'local' && baseUrl) {
-    return { model: 'qwen3-embedding', baseUrl, dimensions };
-  }
-  return null;
-}
-
 export type ResolvedMemorySearchConfig = {
   enabled: boolean;
   sources: Array<"memory" | "sessions">;
-  provider: "openai" | "local" | "gemini" | "auto";
+  extraPaths: string[];
+  provider: "openai" | "local" | "gemini" | "voyage" | "auto";
   remote?: {
     baseUrl?: string;
     apiKey?: string;
@@ -47,7 +25,7 @@ export type ResolvedMemorySearchConfig = {
   experimental: {
     sessionMemory: boolean;
   };
-  fallback: "openai" | "gemini" | "local" | "none";
+  fallback: "openai" | "gemini" | "local" | "voyage" | "none";
   model: string;
   local: {
     modelPath?: string;
@@ -94,6 +72,7 @@ export type ResolvedMemorySearchConfig = {
 
 const DEFAULT_OPENAI_MODEL = "text-embedding-3-small";
 const DEFAULT_GEMINI_MODEL = "gemini-embedding-001";
+const DEFAULT_VOYAGE_MODEL = "voyage-4-large";
 const DEFAULT_CHUNK_TOKENS = 400;
 const DEFAULT_CHUNK_OVERLAP = 80;
 const DEFAULT_WATCH_DEBOUNCE_MS = 1500;
@@ -115,17 +94,25 @@ function normalizeSources(
   const normalized = new Set<"memory" | "sessions">();
   const input = sources?.length ? sources : DEFAULT_SOURCES;
   for (const source of input) {
-    if (source === "memory") normalized.add("memory");
-    if (source === "sessions" && sessionMemoryEnabled) normalized.add("sessions");
+    if (source === "memory") {
+      normalized.add("memory");
+    }
+    if (source === "sessions" && sessionMemoryEnabled) {
+      normalized.add("sessions");
+    }
   }
-  if (normalized.size === 0) normalized.add("memory");
+  if (normalized.size === 0) {
+    normalized.add("memory");
+  }
   return Array.from(normalized);
 }
 
 function resolveStorePath(agentId: string, raw?: string): string {
   const stateDir = resolveStateDir(process.env, os.homedir);
   const fallback = path.join(stateDir, "memory", `${agentId}.sqlite`);
-  if (!raw) return fallback;
+  if (!raw) {
+    return fallback;
+  }
   const withToken = raw.includes("{agentId}") ? raw.replaceAll("{agentId}", agentId) : raw;
   return resolveUserPath(withToken);
 }
@@ -150,7 +137,11 @@ function mergeConfig(
     defaultRemote?.headers,
   );
   const includeRemote =
-    hasRemoteConfig || provider === "openai" || provider === "gemini" || provider === "auto";
+    hasRemoteConfig ||
+    provider === "openai" ||
+    provider === "gemini" ||
+    provider === "voyage" ||
+    provider === "auto";
   const batch = {
     enabled: overrideRemote?.batch?.enabled ?? defaultRemote?.batch?.enabled ?? true,
     wait: overrideRemote?.batch?.wait ?? defaultRemote?.batch?.wait ?? true,
@@ -177,13 +168,19 @@ function mergeConfig(
       ? DEFAULT_GEMINI_MODEL
       : provider === "openai"
         ? DEFAULT_OPENAI_MODEL
-        : undefined;
+        : provider === "voyage"
+          ? DEFAULT_VOYAGE_MODEL
+          : undefined;
   const model = overrides?.model ?? defaults?.model ?? modelDefault ?? "";
   const local = {
     modelPath: overrides?.local?.modelPath ?? defaults?.local?.modelPath,
     modelCacheDir: overrides?.local?.modelCacheDir ?? defaults?.local?.modelCacheDir,
   };
   const sources = normalizeSources(overrides?.sources ?? defaults?.sources, sessionMemory);
+  const rawPaths = [...(defaults?.extraPaths ?? []), ...(overrides?.extraPaths ?? [])]
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const extraPaths = Array.from(new Set(rawPaths));
   const vector = {
     enabled: overrides?.store?.vector?.enabled ?? defaults?.store?.vector?.enabled ?? true,
     extensionPath:
@@ -258,6 +255,7 @@ function mergeConfig(
   return {
     enabled,
     sources,
+    extraPaths,
     provider,
     remote,
     experimental: {
@@ -296,30 +294,14 @@ function mergeConfig(
 }
 
 export function resolveMemorySearchConfig(
-  cfg: MoltbotConfig,
+  cfg: OpenClawConfig,
   agentId: string,
 ): ResolvedMemorySearchConfig | null {
   const defaults = cfg.agents?.defaults?.memorySearch;
   const overrides = resolveAgentConfig(cfg, agentId)?.memorySearch;
   const resolved = mergeConfig(defaults, overrides, agentId);
-  if (!resolved.enabled) return null;
-
-  // Read .embedding-config to override with local Ollama settings
-  const embeddingConfigPath = path.join(os.homedir(), '.embedding-config');
-  try {
-    const content = fs.readFileSync(embeddingConfigPath, 'utf8');
-    const embedding = parseEmbeddingConfig(content);
-    if (embedding) {
-      resolved.provider = 'local';
-      resolved.remote = {
-        ...resolved.remote,
-        baseUrl: embedding.baseUrl,
-      };
-      resolved.model = embedding.model;
-    }
-  } catch {
-    // Ignore if file not found or parse error
+  if (!resolved.enabled) {
+    return null;
   }
-
   return resolved;
 }

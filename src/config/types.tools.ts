@@ -226,13 +226,15 @@ export type MemorySearchConfig = {
   enabled?: boolean;
   /** Sources to index and search (default: ["memory"]). */
   sources?: Array<"memory" | "sessions">;
+  /** Extra paths to include in memory search (directories or .md files). */
+  extraPaths?: string[];
   /** Experimental memory search settings. */
   experimental?: {
     /** Enable session transcript indexing (experimental, default: false). */
     sessionMemory?: boolean;
   };
   /** Embedding provider mode. */
-  provider?: "openai" | "gemini" | "local";
+  provider?: "openai" | "gemini" | "local" | "voyage";
   remote?: {
     baseUrl?: string;
     apiKey?: string;
@@ -251,7 +253,7 @@ export type MemorySearchConfig = {
     };
   };
   /** Fallback behavior when embeddings fail. */
-  fallback?: "openai" | "gemini" | "local" | "none";
+  fallback?: "openai" | "gemini" | "local" | "voyage" | "none";
   /** Embedding model id (remote) or alias (local). */
   model?: string;
   /** Local embedding settings (node-llama-cpp). */
@@ -359,6 +361,8 @@ export type ToolsConfig = {
       enabled?: boolean;
       /** Max characters to return from fetched content. */
       maxChars?: number;
+      /** Hard cap for maxChars (tool or config), defaults to 50000. */
+      maxCharsCap?: number;
       /** Timeout in seconds for fetch requests. */
       timeoutSeconds?: number;
       /** Cache TTL in minutes for fetched content. */

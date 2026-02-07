@@ -24,6 +24,5 @@ export type UsageProviderId =
   | "google-antigravity"
   | "minimax"
   | "openai-codex"
-  | "zai"
-  | "deepseek"
-  | "moonshot";
+  | "xiaomi"
+  | "zai";
