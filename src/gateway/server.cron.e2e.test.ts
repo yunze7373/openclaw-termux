@@ -115,7 +115,7 @@ describe("gateway server cron", () => {
         | { schedule?: unknown; sessionTarget?: unknown; wakeMode?: unknown }
         | undefined;
       expect(wrappedPayload?.sessionTarget).toBe("main");
-      expect(wrappedPayload?.wakeMode).toBe("next-heartbeat");
+      expect(wrappedPayload?.wakeMode).toBe("now");
       expect((wrappedPayload?.schedule as { kind?: unknown } | undefined)?.kind).toBe("at");
 
       const patchRes = await rpcReq(ws, "cron.add", {
@@ -184,6 +184,32 @@ describe("gateway server cron", () => {
       expect(merged?.payload?.deliver).toBe(true);
       expect(merged?.payload?.channel).toBe("telegram");
       expect(merged?.payload?.to).toBe("19098680");
+
+      const legacyDeliveryPatchRes = await rpcReq(ws, "cron.update", {
+        id: mergeJobId,
+        patch: {
+          payload: {
+            kind: "agentTurn",
+            deliver: true,
+            channel: "signal",
+            to: "+15550001111",
+            bestEffortDeliver: true,
+          },
+        },
+      });
+      expect(legacyDeliveryPatchRes.ok).toBe(true);
+      const legacyDeliveryPatched = legacyDeliveryPatchRes.payload as
+        | {
+            payload?: { kind?: unknown; message?: unknown };
+            delivery?: { mode?: unknown; channel?: unknown; to?: unknown; bestEffort?: unknown };
+          }
+        | undefined;
+      expect(legacyDeliveryPatched?.payload?.kind).toBe("agentTurn");
+      expect(legacyDeliveryPatched?.payload?.message).toBe("hello");
+      expect(legacyDeliveryPatched?.delivery?.mode).toBe("announce");
+      expect(legacyDeliveryPatched?.delivery?.channel).toBe("signal");
+      expect(legacyDeliveryPatched?.delivery?.to).toBe("+15550001111");
+      expect(legacyDeliveryPatched?.delivery?.bestEffort).toBe(true);
 
       const rejectRes = await rpcReq(ws, "cron.add", {
         name: "patch reject",
