@@ -4,7 +4,6 @@
 - **项目名称**: Moltbot (Termux Fork)
 - **仓库**: github.com/yunze7373/openclaw-termux
 - **Workspace**: github.com/yunze7373/openclaw-termux-workspace
-- **所有者**: 韩哥 (Yingze Han / yunze7373)
 - **目标**: 在 Android Termux 环境运行的个人 AI 助手
 
 ## 主要特性
