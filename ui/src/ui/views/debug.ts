@@ -91,7 +91,13 @@ export function renderDebug(props: DebugProps) {
           </label>
         </div>
         <div class="row" style="margin-top: 12px;">
-          <button class="btn primary" @click=${props.onCall}>Call</button>
+          <button
+            class="btn primary"
+            ?disabled=${!props.callMethod.trim()}
+            @click=${props.onCall}
+          >
+            Call
+          </button>
         </div>
         ${
           props.callError

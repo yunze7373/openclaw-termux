@@ -249,12 +249,18 @@ export async function runEmbeddedPiAgent(
           lastProfileId = resolvedProfileId;
           return;
         }
-        if (model.provider === "github-copilot") {
+
+        const providerConfig = params.config?.models?.providers?.[model.provider];
+        const isAzureAi = providerConfig?.baseUrl?.includes("models.inference.ai.azure.com");
+
+        if (model.provider === "github-copilot" && !isAzureAi) {
+          console.info(`[Auth] Resolving GitHub Copilot token for ${model.id}...`);
           const { resolveCopilotApiToken } =
             await import("../../providers/github-copilot-token.js");
           const copilotToken = await resolveCopilotApiToken({
             githubToken: apiKeyInfo.apiKey,
           });
+          console.info(`[Auth] GitHub Copilot token resolved successfully.`);
           authStorage.setRuntimeApiKey(model.provider, copilotToken.token);
         } else {
           authStorage.setRuntimeApiKey(model.provider, apiKeyInfo.apiKey);
@@ -390,6 +396,8 @@ export async function runEmbeddedPiAgent(
 
           if (promptError && !aborted) {
             const errorText = describeUnknownError(promptError);
+            log.error(`Embedded run prompt error [${provider}/${modelId}]: ${errorText}`);
+
             if (isContextOverflowError(errorText)) {
               const msgCount = attempt.messagesSnapshot?.length ?? 0;
               log.warn(

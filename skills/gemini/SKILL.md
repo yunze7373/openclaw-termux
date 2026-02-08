@@ -11,11 +11,11 @@ metadata:
         "install":
           [
             {
-              "id": "brew",
-              "kind": "brew",
-              "formula": "gemini-cli",
+              "id": "node",
+              "kind": "node",
+              "package": "@google/gemini-cli",
               "bins": ["gemini"],
-              "label": "Install Gemini CLI (brew)",
+              "label": "Install Gemini CLI (npm)",
             },
           ],
       },

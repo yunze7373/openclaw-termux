@@ -924,7 +924,9 @@ function applyChannelHints(hints: ConfigUiHints, channels: ChannelUiMetadata[]):
         continue;
       }
       const key = `${basePath}.${relPath}`;
+      const isDeep = relPath.includes(".");
       next[key] = {
+        advanced: isDeep,
         ...next[key],
         ...hint,
       };

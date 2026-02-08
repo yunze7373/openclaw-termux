@@ -282,6 +282,14 @@ export function resolveNodeManagerOptions(): Array<{
   value: NodeManagerChoice;
   label: string;
 }> {
+  // Termux: recommend pnpm (PNPM_HOME is auto-injected in skills-install.ts)
+  if (process.env.TERMUX_VERSION || process.platform === "android") {
+    return [
+      { value: "pnpm", label: "pnpm (recommended for Termux)" },
+      { value: "npm", label: "npm" },
+      { value: "bun", label: "bun (experimental)" },
+    ];
+  }
   return [
     { value: "npm", label: "npm" },
     { value: "pnpm", label: "pnpm" },

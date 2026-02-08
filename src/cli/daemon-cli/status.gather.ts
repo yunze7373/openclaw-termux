@@ -237,6 +237,12 @@ export async function gatherDaemonStatus(
       })
     : undefined;
 
+  // On Android, there is no service manager, so "service.loaded" is always false.
+  // If RPC is successful, we know the gateway is running manually.
+  if (process.platform === "android" && rpc?.ok && runtime) {
+    runtime.status = "running (manual)";
+  }
+
   let lastError: string | undefined;
   if (loaded && runtime?.status === "running" && portStatus && portStatus.status !== "busy") {
     lastError = (await readLastGatewayErrorLine(mergedDaemonEnv as NodeJS.ProcessEnv)) ?? undefined;

@@ -21,10 +21,62 @@ function prefersSips(): boolean {
   );
 }
 
+function prefersMagick(): boolean {
+  return (
+    process.env.CLAWDBOT_IMAGE_BACKEND === "magick" ||
+    (process.env.CLAWDBOT_IMAGE_BACKEND !== "sharp" && process.platform === "android")
+  );
+}
+
 async function loadSharp(): Promise<(buffer: Buffer) => ReturnType<Sharp>> {
   const mod = (await import("sharp")) as unknown as { default?: Sharp };
   const sharp = mod.default ?? (mod as unknown as Sharp);
   return (buffer) => sharp(buffer, { failOnError: false });
+}
+
+async function magickMetadataFromBuffer(buffer: Buffer): Promise<ImageMetadata | null> {
+  return await withTempDir(async (dir) => {
+    const input = path.join(dir, "in.img");
+    await fs.writeFile(input, buffer);
+    const { stdout } = await runExec("identify", ["-format", "%w %h", input], {
+      timeoutMs: 10_000,
+    });
+    const parts = stdout.trim().split(/\s+/);
+    const width = Number.parseInt(parts[0] ?? "0", 10);
+    const height = Number.parseInt(parts[1] ?? "0", 10);
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+    if (width <= 0 || height <= 0) return null;
+    return { width, height };
+  });
+}
+
+async function magickResize(params: {
+  buffer: Buffer;
+  maxSide: number;
+  quality: number;
+  format: "jpeg" | "png";
+  withoutEnlargement?: boolean;
+}): Promise<Buffer> {
+  return await withTempDir(async (dir) => {
+    const input = path.join(dir, "in.img");
+    const output = path.join(dir, `out.${params.format}`);
+    await fs.writeFile(input, params.buffer);
+
+    const resizeArg = params.withoutEnlargement ? `${params.maxSide}x${params.maxSide}>` : `${params.maxSide}x${params.maxSide}`;
+
+    const args = [
+      input,
+      "-auto-orient",
+      "-resize",
+      resizeArg,
+      "-quality",
+      String(Math.max(1, Math.min(100, Math.round(params.quality)))),
+      output,
+    ];
+
+    await runExec("magick", args, { timeoutMs: 60_000 });
+    return await fs.readFile(output);
+  });
 }
 
 /**
@@ -209,6 +261,9 @@ export async function getImageMetadata(buffer: Buffer): Promise<ImageMetadata | 
   if (prefersSips()) {
     return await sipsMetadataFromBuffer(buffer).catch(() => null);
   }
+  if (prefersMagick()) {
+    return await magickMetadataFromBuffer(buffer).catch(() => null);
+  }
 
   try {
     const sharp = await loadSharp();
@@ -290,6 +345,19 @@ export async function normalizeExifOrientation(buffer: Buffer): Promise<Buffer> 
       return buffer;
     }
   }
+  if (prefersMagick()) {
+    try {
+      return await withTempDir(async (dir) => {
+        const input = path.join(dir, "in.img");
+        const output = path.join(dir, "out.jpg");
+        await fs.writeFile(input, buffer);
+        await runExec("magick", [input, "-auto-orient", output], { timeoutMs: 20_000 });
+        return await fs.readFile(output);
+      });
+    } catch {
+      return buffer;
+    }
+  }
 
   try {
     const sharp = await loadSharp();
@@ -331,8 +399,30 @@ export async function resizeToJpeg(params: {
       quality: params.quality,
     });
   }
+  if (prefersMagick()) {
+    return await magickResize({
+      buffer: params.buffer,
+      maxSide: params.maxSide,
+      quality: params.quality,
+      format: "jpeg",
+      withoutEnlargement: params.withoutEnlargement !== false,
+    });
+  }
 
-  const sharp = await loadSharp();
+  let sharp: (buffer: Buffer) => ReturnType<Sharp>;
+  try {
+    sharp = await loadSharp();
+  } catch (e) {
+    // Fallback to ImageMagick if Sharp fails to load (e.g. on Android/Termux)
+    return await magickResize({
+      buffer: params.buffer,
+      maxSide: params.maxSide,
+      quality: params.quality,
+      format: "jpeg",
+      withoutEnlargement: params.withoutEnlargement !== false,
+    });
+  }
+
   // Use .rotate() BEFORE .resize() to auto-rotate based on EXIF orientation
   return await sharp(params.buffer)
     .rotate() // Auto-rotate based on EXIF before resizing
@@ -350,8 +440,27 @@ export async function convertHeicToJpeg(buffer: Buffer): Promise<Buffer> {
   if (prefersSips()) {
     return await sipsConvertToJpeg(buffer);
   }
-  const sharp = await loadSharp();
-  return await sharp(buffer).jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+  if (prefersMagick()) {
+    return await magickResize({
+      buffer,
+      maxSide: 99999, // dummy
+      quality: 90,
+      format: "jpeg",
+      withoutEnlargement: true,
+    });
+  }
+  try {
+    const sharp = await loadSharp();
+    return await sharp(buffer).jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+  } catch (e) {
+    return await magickResize({
+      buffer,
+      maxSide: 99999, // dummy
+      quality: 90,
+      format: "jpeg",
+      withoutEnlargement: true,
+    });
+  }
 }
 
 /**
@@ -359,6 +468,18 @@ export async function convertHeicToJpeg(buffer: Buffer): Promise<Buffer> {
  * Returns true if the image has alpha, false otherwise.
  */
 export async function hasAlphaChannel(buffer: Buffer): Promise<boolean> {
+  if (prefersMagick()) {
+    try {
+      return await withTempDir(async (dir) => {
+        const input = path.join(dir, "in.img");
+        await fs.writeFile(input, buffer);
+        const { stdout } = await runExec("identify", ["-format", "%[channels]", input], { timeoutMs: 10_000 });
+        return stdout.toLowerCase().includes("alpha");
+      });
+    } catch {
+      return false;
+    }
+  }
   try {
     const sharp = await loadSharp();
     const meta = await sharp(buffer).metadata();
@@ -381,7 +502,27 @@ export async function resizeToPng(params: {
   compressionLevel?: number;
   withoutEnlargement?: boolean;
 }): Promise<Buffer> {
-  const sharp = await loadSharp();
+  if (prefersMagick()) {
+    return await magickResize({
+      buffer: params.buffer,
+      maxSide: params.maxSide,
+      quality: 100, // PNG quality is ignore, use compression instead usually, but our helper uses -quality
+      format: "png",
+      withoutEnlargement: params.withoutEnlargement !== false,
+    });
+  }
+  let sharp: (buffer: Buffer) => ReturnType<Sharp>;
+  try {
+    sharp = await loadSharp();
+  } catch (e) {
+    return await magickResize({
+      buffer: params.buffer,
+      maxSide: params.maxSide,
+      quality: 100, // PNG quality is ignore, use compression instead usually, but our helper uses -quality
+      format: "png",
+      withoutEnlargement: params.withoutEnlargement !== false,
+    });
+  }
   // Compression level 6 is a good balance (0=fastest, 9=smallest)
   const compressionLevel = params.compressionLevel ?? 6;
 

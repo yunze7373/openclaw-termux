@@ -513,6 +513,23 @@ export async function finalizeOnboardingWizard(
     "What now",
   );
 
+  if (process.env.TERMUX_VERSION) {
+    await prompter.note(
+      [
+        "Termux Process Management (PM2):",
+        "• Status:  openclaw gateway status",
+        "• Start:   openclaw gateway start",
+        "• Stop:    openclaw gateway stop",
+        "• Restart: openclaw gateway restart",
+        "• Logs:    pm2 logs openclaw-gateway",
+        "",
+        "Tip: To prevent Termux from killing background processes,",
+        "acquire a wake lock from the notification shade.",
+      ].join("\n"),
+      "Termux Tips",
+    );
+  }
+
   await prompter.outro(
     controlUiOpened
       ? "Onboarding complete. Dashboard opened; keep that tab to control OpenClaw."

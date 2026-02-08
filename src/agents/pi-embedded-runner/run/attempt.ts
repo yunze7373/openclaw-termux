@@ -143,8 +143,11 @@ export async function runEmbeddedAttempt(
   const prevCwd = process.cwd();
   const runAbortController = new AbortController();
 
-  log.debug(
-    `embedded run start: runId=${params.runId} sessionId=${params.sessionId} provider=${params.provider} model=${params.modelId} thinking=${params.thinkLevel} messageChannel=${params.messageChannel ?? params.messageProvider ?? "unknown"}`,
+  // [MOD] Make API requests explicit in logs
+  console.info(
+    `[API Request] Starting: runId=${params.runId} session=${params.sessionKey || params.sessionId} ` +
+    `model=${params.provider}/${params.modelId} url=${params.model.baseUrl || "default"} ` +
+    `thinking=${params.thinkLevel}`
   );
 
   await fs.mkdir(resolvedWorkspace, { recursive: true });
@@ -665,8 +668,8 @@ export async function runEmbeddedAttempt(
       const abortTimer = setTimeout(
         () => {
           if (!isProbeSession) {
-            log.warn(
-              `embedded run timeout: runId=${params.runId} sessionId=${params.sessionId} timeoutMs=${params.timeoutMs}`,
+            console.warn(
+              `[API Timeout] Request timed out: runId=${params.runId} sessionId=${params.sessionId} timeoutMs=${params.timeoutMs} model=${params.provider}/${params.modelId}`
             );
           }
           abortRun(true);
@@ -812,11 +815,13 @@ export async function runEmbeddedAttempt(
 
           // Only pass images option if there are actually images to pass
           // This avoids potential issues with models that don't expect the images parameter
+          console.info(`[API Request] Sending prompt to ${params.provider}/${params.modelId}...`);
           if (imageResult.images.length > 0) {
             await abortable(activeSession.prompt(effectivePrompt, { images: imageResult.images }));
           } else {
             await abortable(activeSession.prompt(effectivePrompt));
           }
+          console.info(`[API Request] Received response from ${params.provider}/${params.modelId}`);
         } catch (err) {
           promptError = err;
         } finally {

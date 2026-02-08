@@ -8,9 +8,14 @@ import {
   normalizeChannelId,
 } from "./index.js";
 
+import { requireActivePluginRegistry } from "../../plugins/runtime.js";
+
 export function listPairingChannels(): ChannelId[] {
-  // Channel docking: pairing support is declared via plugin.pairing.
-  return listChannelPlugins()
+  const registry = requireActivePluginRegistry();
+  process.stderr.write(`DEBUG: registry plugins: ${registry.plugins.length}, channels: ${registry.channels.length}\n`);
+  const all = listChannelPlugins();
+  process.stderr.write(`DEBUG: listChannelPlugins: ${all.map(p => p.id).join(", ")}\n`);
+  return all
     .filter((plugin) => plugin.pairing)
     .map((plugin) => plugin.id);
 }

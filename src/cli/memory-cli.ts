@@ -424,6 +424,11 @@ export async function runMemoryStatus(opts: MemoryCommandOptions) {
       }
       if (status.vector.loadError) {
         lines.push(`${label("Vector error")} ${warn(status.vector.loadError)}`);
+        // Add Termux-specific fix suggestion
+        const isTermuxEnv = process.platform === "android" || Boolean(process.env.TERMUX_VERSION);
+        if (isTermuxEnv) {
+          lines.push(`${label("Fix")} Run: ${info("bash scripts/fix-sqlite-vec.sh")} in the openclaw directory`);
+        }
       }
     }
     if (status.fts) {

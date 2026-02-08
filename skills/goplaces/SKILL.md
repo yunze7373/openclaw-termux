@@ -18,6 +18,13 @@ metadata:
               "bins": ["goplaces"],
               "label": "Install goplaces (brew)",
             },
+            {
+              "id": "go",
+              "kind": "go",
+              "module": "github.com/steipete/goplaces/cmd/goplaces@latest",
+              "bins": ["goplaces"],
+              "label": "Install goplaces (go install)",
+            },
           ],
       },
   }

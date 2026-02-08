@@ -151,6 +151,7 @@ export function resolveBrowserConfig(
   cfg: BrowserConfig | undefined,
   rootConfig?: OpenClawConfig,
 ): ResolvedBrowserConfig {
+  const isTermuxAndroid = process.platform === "android" || Boolean(process.env.TERMUX_VERSION);
   const enabled = cfg?.enabled ?? DEFAULT_OPENCLAW_BROWSER_ENABLED;
   const evaluateEnabled = cfg?.evaluateEnabled ?? DEFAULT_BROWSER_EVALUATE_ENABLED;
   const gatewayPort = resolveGatewayPort(rootConfig);
@@ -189,8 +190,8 @@ export function resolveBrowserConfig(
     };
   }
 
-  const headless = cfg?.headless === true;
-  const noSandbox = cfg?.noSandbox === true;
+  const headless = cfg?.headless ?? isTermuxAndroid;
+  const noSandbox = cfg?.noSandbox ?? isTermuxAndroid;
   const attachOnly = cfg?.attachOnly === true;
   const executablePath = cfg?.executablePath?.trim() || undefined;
 

@@ -191,6 +191,9 @@ export function renderRuntimeHints(
 }
 
 export function renderGatewayServiceStartHints(env: NodeJS.ProcessEnv = process.env): string[] {
+  if (process.platform === "android") {
+    return [formatCliCommand("openclaw gateway", env)];
+  }
   const base = [
     formatCliCommand("openclaw gateway install", env),
     formatCliCommand("openclaw gateway", env),

@@ -200,6 +200,21 @@ export function resolveModel(
       return { model: anthropicForwardCompat, authStorage, modelRegistry };
     }
     const providerCfg = providers[provider];
+    if (modelId === "raptor-mini") {
+      const raptorModel: Model<Api> = normalizeModelCompat({
+        id: "raptor-mini",
+        name: "raptor-mini",
+        api: "openai-responses" as Api,
+        provider: "github-copilot",
+        baseUrl: providerCfg?.baseUrl,
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200_000,
+        maxTokens: 64_000,
+      } as Model<Api>);
+      return { model: raptorModel, authStorage, modelRegistry };
+    }
     if (providerCfg || modelId.startsWith("mock-")) {
       const fallbackModel: Model<Api> = normalizeModelCompat({
         id: modelId,

@@ -83,6 +83,62 @@ async function createLocalEmbeddingProvider(
   const modelPath = options.local?.modelPath?.trim() || DEFAULT_LOCAL_MODEL;
   const modelCacheDir = options.local?.modelCacheDir?.trim();
 
+  // Check for .embedding-config
+  const embeddingConfigPath = resolveUserPath("~/.embedding-config");
+  let useOllama = false;
+  let ollamaBaseUrl = "";
+  let ollamaModel = "";
+  try {
+    const configContent = fsSync.readFileSync(embeddingConfigPath, "utf-8");
+    const config: Record<string, string> = {};
+    for (const line of configContent.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#")) {
+        const [key, ...valueParts] = trimmed.split("=");
+        if (key && valueParts.length > 0) {
+          config[key] = valueParts.join("=").replace(/^["']|["']$/g, "");
+        }
+      }
+    }
+    if (config.EMBEDDING_MODEL === "local") {
+      useOllama = true;
+      ollamaBaseUrl = config.OLLAMA_BASE_URL || "";
+      ollamaModel = config.OLLAMA_EMBEDDING_MODEL || "qwen3-embedding";
+    }
+  } catch {
+    // Config not found or invalid, use GGUF
+  }
+
+  if (useOllama && ollamaBaseUrl) {
+    // Use Ollama API
+    const embedQuery = async (text: string): Promise<number[]> => {
+      const response = await fetch(`${ollamaBaseUrl}/api/embeddings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: ollamaModel, prompt: text }),
+      });
+      if (!response.ok) {
+        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (!data.embedding || !Array.isArray(data.embedding)) {
+        throw new Error("Invalid Ollama embedding response");
+      }
+      return data.embedding;
+    };
+    const embedBatch = async (texts: string[]): Promise<number[][]> => {
+      const embeddings = await Promise.all(texts.map(embedQuery));
+      return embeddings;
+    };
+    return {
+      id: "local-ollama",
+      model: ollamaModel,
+      embedQuery,
+      embedBatch,
+    };
+  }
+
+  // Fallback to GGUF
   // Lazy-load node-llama-cpp to keep startup light unless local is enabled.
   const { getLlama, resolveModelFile, LlamaLogLevel } = await importNodeLlamaCpp();
 

@@ -23,6 +23,8 @@ export type GetReplyOptions = {
   /** Notifies when an agent run actually starts (useful for webchat command handling). */
   onAgentRunStart?: (runId: string) => void;
   onReplyStart?: () => Promise<void> | void;
+  /** Called when the typing controller cleans up (e.g., run ended with NO_REPLY). */
+  onTypingCleanup?: () => void;
   onTypingController?: (typing: TypingController) => void;
   isHeartbeat?: boolean;
   onPartialReply?: (payload: ReplyPayload) => Promise<void> | void;
@@ -37,6 +39,8 @@ export type GetReplyOptions = {
   blockReplyTimeoutMs?: number;
   /** If provided, only load these skills for this session (empty = no skills). */
   skillFilter?: string[];
+  /** Override the model ID for this request. */
+  modelOverride?: string;
   /** Mutable ref to track if a reply was sent (for Slack "first" threading mode). */
   hasRepliedRef?: { value: boolean };
 };

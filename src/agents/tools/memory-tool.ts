@@ -1,3 +1,6 @@
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+import fs from "node:fs";
 import { Type } from "@sinclair/typebox";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { MemoryCitationsMode } from "../../config/types.memory.js";
@@ -9,6 +12,8 @@ import { parseAgentSessionKey } from "../../routing/session-key.js";
 import { resolveSessionAgentId } from "../agent-scope.js";
 import { resolveMemorySearchConfig } from "../memory-search.js";
 import { jsonResult, readNumberParam, readStringParam } from "./common.js";
+
+const execAsync = promisify(exec);
 
 const MemorySearchSchema = Type.Object({
   query: Type.String(),
@@ -47,6 +52,40 @@ export function createMemorySearchTool(options: {
       const query = readStringParam(params, "query", { required: true });
       const maxResults = readNumberParam(params, "maxResults");
       const minScore = readNumberParam(params, "minScore");
+
+      // 1. Try Supabase Memory Manager
+      try {
+        const limit = maxResults || 5;
+        const scriptPath = "scripts/memory-manager.sh";
+        // Check if script exists
+        if (fs.existsSync(scriptPath)) {
+          const safeQuery = query.replace(/"/g, '\\"');
+          const { stdout } = await execAsync(`bash ${scriptPath} search "${safeQuery}" --limit ${limit}`);
+          
+          const supResults = JSON.parse(stdout.trim());
+          
+          if (Array.isArray(supResults) && supResults.length > 0) {
+             const results = supResults.map((r: any) => ({
+               path: r.path || "supabase-memory",
+               snippet: r.content,
+               startLine: 1,
+               endLine: 1,
+               score: r.similarity
+             }));
+             
+             return jsonResult({
+               results,
+               provider: "supabase-vector",
+               model: "qwen3-embedding",
+               fallback: false,
+               backend: "memory-manager-sh"
+             });
+          }
+        }
+      } catch (err) {
+        // Fallback to native on error or empty result
+      }
+
       const { manager, error } = await getMemorySearchManager({
         cfg,
         agentId,

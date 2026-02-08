@@ -51,6 +51,7 @@ async function notifyApproved(channel: PairingChannel, id: string) {
 
 export function registerPairingCli(program: Command) {
   const channels = listPairingChannels();
+  // console.error("DEBUG: registerPairingCli channels:", channels);
   const pairing = program
     .command("pairing")
     .description("Secure DM pairing (approve inbound requests)")

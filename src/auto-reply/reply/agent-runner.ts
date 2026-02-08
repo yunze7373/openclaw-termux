@@ -331,6 +331,10 @@ export async function runReplyAgent(params: {
       resolvedVerboseLevel,
     });
 
+    if (runOutcome.kind === "final" && runOutcome.payload?.isError) {
+       console.error(`[Agent Runner] Terminal error during turn: ${runOutcome.payload.text}`);
+    }
+
     if (runOutcome.kind === "final") {
       return finalizeWithFollowup(runOutcome.payload, queueKey, runFollowupTurn);
     }
@@ -467,7 +471,9 @@ export async function runReplyAgent(params: {
     const responseUsageRaw =
       activeSessionEntry?.responseUsage ??
       (sessionKey ? activeSessionStore?.[sessionKey]?.responseUsage : undefined);
-    const responseUsageMode = resolveResponseUsageMode(responseUsageRaw);
+    // Default to "tokens" mode if not explicitly configured (undefined), otherwise respect the setting (including "off")
+    const responseUsageMode =
+      responseUsageRaw === undefined ? "tokens" : resolveResponseUsageMode(responseUsageRaw);
     if (responseUsageMode !== "off" && hasNonzeroUsage(usage)) {
       const authMode = resolveModelAuthMode(providerUsed, cfg);
       const showCost = authMode === "api-key";

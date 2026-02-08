@@ -9,13 +9,18 @@ export const DEFAULT_MEMORY_FLUSH_SOFT_TOKENS = 4000;
 
 export const DEFAULT_MEMORY_FLUSH_PROMPT = [
   "Pre-compaction memory flush.",
-  "Store durable memories now (use memory/YYYY-MM-DD.md; create memory/ if needed).",
+  "Follow the 4-layer memory architecture:",
+  "1. Update MEMORY.md core summary (keep it under 30000 chars; summary only).",
+  "2. Store detailed technical logs and work history in memory/YYYY-MM-DD.md (create memory/ if needed).",
+  "3. Use scripts/memory-manager.sh to store key memories in Supabase vector store.",
+  "4. Archive MEMORY.md if it grows too large.",
   `If nothing to store, reply with ${SILENT_REPLY_TOKEN}.`,
 ].join(" ");
 
 export const DEFAULT_MEMORY_FLUSH_SYSTEM_PROMPT = [
   "Pre-compaction memory flush turn.",
   "The session is near auto-compaction; capture durable memories to disk.",
+  "Architecture: MEMORY.md (core summary) + memory/YYYY-MM-DD.md (daily details) + Supabase (vectors).",
   `You may reply, but usually ${SILENT_REPLY_TOKEN} is correct.`,
 ].join(" ");
 

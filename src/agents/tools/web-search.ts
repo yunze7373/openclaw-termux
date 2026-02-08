@@ -44,17 +44,17 @@ const WebSearchSchema = Type.Object({
   country: Type.Optional(
     Type.String({
       description:
-        "2-letter country code for region-specific results (e.g., 'DE', 'US', 'ALL'). Default: 'US'.",
+        "2-letter country code for region-specific results (e.g., 'DE', 'US'). Default: 'US'.",
     }),
   ),
   search_lang: Type.Optional(
     Type.String({
-      description: "ISO language code for search results (e.g., 'de', 'en', 'fr').",
+      description: "ISO language code for search results (e.g., 'en', 'zh-hans', 'ja').",
     }),
   ),
   ui_lang: Type.Optional(
     Type.String({
-      description: "ISO language code for UI elements.",
+      description: "Language code for UI elements (e.g., 'en-US', 'zh-CN', 'ja-JP').",
     }),
   ),
   freshness: Type.Optional(
@@ -245,6 +245,88 @@ function resolvePerplexityModel(perplexity?: PerplexityConfig): string {
       ? perplexity.model.trim()
       : "";
   return fromConfig || DEFAULT_PERPLEXITY_MODEL;
+}
+
+function normalizeSearchLang(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const lower = value.trim().toLowerCase();
+  if (!lower) return undefined;
+
+  // Brave Search API specific mappings for search_lang
+  const mapping: Record<string, string> = {
+    "zh-cn": "zh-hans",
+    "zh-hans": "zh-hans",
+    "zh-tw": "zh-hant",
+    "zh-hant": "zh-hant",
+    "zh-hk": "zh-hant",
+    ja: "jp",
+    ko: "ko",
+    "ko-kr": "ko",
+    en: "en",
+    "en-us": "en",
+    "en-gb": "en-gb",
+    "pt-br": "pt-br",
+    "pt-pt": "pt-pt",
+    pt: "pt-pt",
+  };
+
+  return mapping[lower] || lower;
+}
+
+function normalizeUiLang(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const lower = value.trim().toLowerCase();
+  if (!lower) return undefined;
+
+  // Brave Search API specific mappings for ui_lang (must be full locale)
+  const mapping: Record<string, string> = {
+    en: "en-US",
+    "en-us": "en-US",
+    "en-gb": "en-GB",
+    zh: "zh-CN",
+    "zh-cn": "zh-CN",
+    "zh-hans": "zh-CN",
+    "zh-tw": "zh-TW",
+    "zh-hant": "zh-TW",
+    "zh-hk": "zh-HK",
+    ja: "ja-JP",
+    "ja-jp": "ja-JP",
+    ko: "ko-KR",
+    "ko-kr": "ko-KR",
+    "pt-br": "pt-BR",
+    "pt-pt": "pt-PT",
+    de: "de-DE",
+    fr: "fr-FR",
+    es: "es-ES",
+    it: "it-IT",
+  };
+
+  return mapping[lower] || lower;
+}
+
+function normalizeCountry(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const lower = value.trim().toLowerCase();
+  if (!lower) return undefined;
+  if (lower === "all") return undefined;
+
+  const mapping: Record<string, string> = {
+    usa: "US",
+    "united states": "US",
+    uk: "GB",
+    "united kingdom": "GB",
+    china: "CN",
+    germany: "DE",
+    france: "FR",
+    japan: "JP",
+    "south korea": "KR",
+    brazil: "BR",
+    russia: "RU",
+    india: "IN",
+  };
+
+  const result = mapping[lower] || lower.toUpperCase();
+  return result.length === 2 ? result : undefined;
 }
 
 function resolveSearchCount(value: unknown, fallback: number): number {
@@ -493,9 +575,9 @@ export function createWebSearchTool(options?: {
       const query = readStringParam(params, "query", { required: true });
       const count =
         readNumberParam(params, "count", { integer: true }) ?? search?.maxResults ?? undefined;
-      const country = readStringParam(params, "country");
-      const search_lang = readStringParam(params, "search_lang");
-      const ui_lang = readStringParam(params, "ui_lang");
+      const country = normalizeCountry(readStringParam(params, "country"));
+      const search_lang = normalizeSearchLang(readStringParam(params, "search_lang"));
+      const ui_lang = normalizeUiLang(readStringParam(params, "ui_lang"));
       const rawFreshness = readStringParam(params, "freshness");
       if (rawFreshness && provider !== "brave") {
         return jsonResult({

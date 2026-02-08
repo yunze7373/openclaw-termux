@@ -17,6 +17,13 @@ metadata:
               "bins": ["gog"],
               "label": "Install gog (brew)",
             },
+            {
+              "id": "go",
+              "kind": "go",
+              "module": "github.com/steipete/gogcli/cmd/gog@latest",
+              "bins": ["gog"],
+              "label": "Install gog (go install)",
+            },
           ],
       },
   }

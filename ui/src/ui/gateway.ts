@@ -225,6 +225,7 @@ export class GatewayBrowserClient {
           });
         }
         this.backoffMs = 800;
+        this.lastSeq = null; // Reset sequence tracking for new connection
         this.opts.onHello?.(hello);
       })
       .catch(() => {

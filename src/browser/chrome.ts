@@ -201,16 +201,19 @@ export async function launchOpenClawChrome(
       "--password-store=basic",
     ];
 
-    if (resolved.headless) {
+    if (resolved.headless || process.platform === "android") {
       // Best-effort; older Chromes may ignore.
       args.push("--headless=new");
       args.push("--disable-gpu");
+      if (process.platform === "android") {
+        args.push("--disable-software-rasterizer");
+      }
     }
     if (resolved.noSandbox) {
       args.push("--no-sandbox");
       args.push("--disable-setuid-sandbox");
     }
-    if (process.platform === "linux") {
+    if (process.platform === "linux" || process.platform === "android") {
       args.push("--disable-dev-shm-usage");
     }
 

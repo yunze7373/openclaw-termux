@@ -207,6 +207,58 @@ describe("gateway server cron", () => {
       expect(legacyDeliveryPatched?.delivery?.to).toBe("+15550001111");
       expect(legacyDeliveryPatched?.delivery?.bestEffort).toBe(true);
 
+      const legacyDeliveryPatchRes = await rpcReq(ws, "cron.update", {
+        id: mergeJobId,
+        patch: {
+          payload: {
+            kind: "agentTurn",
+            deliver: true,
+            channel: "signal",
+            to: "+15550001111",
+            bestEffortDeliver: true,
+          },
+        },
+      });
+      expect(legacyDeliveryPatchRes.ok).toBe(true);
+      const legacyDeliveryPatched = legacyDeliveryPatchRes.payload as
+        | {
+            payload?: { kind?: unknown; message?: unknown };
+            delivery?: { mode?: unknown; channel?: unknown; to?: unknown; bestEffort?: unknown };
+          }
+        | undefined;
+      expect(legacyDeliveryPatched?.payload?.kind).toBe("agentTurn");
+      expect(legacyDeliveryPatched?.payload?.message).toBe("hello");
+      expect(legacyDeliveryPatched?.delivery?.mode).toBe("announce");
+      expect(legacyDeliveryPatched?.delivery?.channel).toBe("signal");
+      expect(legacyDeliveryPatched?.delivery?.to).toBe("+15550001111");
+      expect(legacyDeliveryPatched?.delivery?.bestEffort).toBe(true);
+
+      const legacyDeliveryPatchRes = await rpcReq(ws, "cron.update", {
+        id: mergeJobId,
+        patch: {
+          payload: {
+            kind: "agentTurn",
+            deliver: true,
+            channel: "signal",
+            to: "+15550001111",
+            bestEffortDeliver: true,
+          },
+        },
+      });
+      expect(legacyDeliveryPatchRes.ok).toBe(true);
+      const legacyDeliveryPatched = legacyDeliveryPatchRes.payload as
+        | {
+            payload?: { kind?: unknown; message?: unknown };
+            delivery?: { mode?: unknown; channel?: unknown; to?: unknown; bestEffort?: unknown };
+          }
+        | undefined;
+      expect(legacyDeliveryPatched?.payload?.kind).toBe("agentTurn");
+      expect(legacyDeliveryPatched?.payload?.message).toBe("hello");
+      expect(legacyDeliveryPatched?.delivery?.mode).toBe("announce");
+      expect(legacyDeliveryPatched?.delivery?.channel).toBe("signal");
+      expect(legacyDeliveryPatched?.delivery?.to).toBe("+15550001111");
+      expect(legacyDeliveryPatched?.delivery?.bestEffort).toBe(true);
+
       const rejectRes = await rpcReq(ws, "cron.add", {
         name: "patch reject",
         enabled: true,

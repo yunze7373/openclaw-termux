@@ -10,8 +10,10 @@ import {
   fetchClaudeUsage,
   fetchCodexUsage,
   fetchCopilotUsage,
+  fetchDeepseekUsage,
   fetchGeminiUsage,
   fetchMinimaxUsage,
+  fetchMoonshotUsage,
   fetchZaiUsage,
 } from "./provider-usage.fetch.js";
 import {
@@ -74,6 +76,10 @@ export async function loadProviderUsageSummary(
             };
           case "zai":
             return await fetchZaiUsage(auth.token, timeoutMs, fetchFn);
+          case "deepseek":
+            return await fetchDeepseekUsage(auth.token, timeoutMs, fetchFn);
+          case "moonshot":
+            return await fetchMoonshotUsage(auth.token, timeoutMs, fetchFn);
           default:
             return {
               provider: auth.provider,

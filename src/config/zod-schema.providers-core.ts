@@ -25,14 +25,11 @@ const ToolPolicyBySenderSchema = z.record(z.string(), ToolPolicySchema).optional
 
 const TelegramInlineButtonsScopeSchema = z.enum(["off", "dm", "group", "all", "allowlist"]);
 
-const TelegramCapabilitiesSchema = z.union([
-  z.array(z.string()),
-  z
-    .object({
-      inlineButtons: TelegramInlineButtonsScopeSchema.optional(),
-    })
-    .strict(),
-]);
+const TelegramCapabilitiesSchema = z
+  .object({
+    inlineButtons: TelegramInlineButtonsScopeSchema.optional(),
+  })
+  .strict();
 
 export const TelegramTopicSchema = z
   .object({
@@ -372,7 +369,7 @@ export const GoogleChatAccountSchema = z
     groupPolicy: GroupPolicySchema.optional().default("allowlist"),
     groupAllowFrom: z.array(z.union([z.string(), z.number()])).optional(),
     groups: z.record(z.string(), GoogleChatGroupSchema.optional()).optional(),
-    serviceAccount: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
+    serviceAccount: z.record(z.string(), z.unknown()).optional(),
     serviceAccountFile: z.string().optional(),
     audienceType: z.enum(["app-url", "project-number"]).optional(),
     audience: z.string().optional(),

@@ -10,6 +10,9 @@ Welcome to the lobster tank! 🦞
 
 ## Maintainers
 
+- **yunze7373** - Termux Fork Maintainer
+  - GitHub: [@yunze7373](https://github.com/yunze7373) · X: [@hanyz_eth](https://x.com/hanyz_eth)
+
 - **Peter Steinberger** - Benevolent Dictator
   - GitHub: [@steipete](https://github.com/steipete) · X: [@steipete](https://x.com/steipete)
 

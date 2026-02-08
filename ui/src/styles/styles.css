@@ -1,0 +1,21 @@
+/* Add this to your existing styles.css */
+
+.model-selector-container {
+  padding: 0 12px 12px;
+}
+
+.model-selector {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--input-bg-color);
+  color: var(--text-color);
+  font-size: 14px;
+}
+
+.model-selector:focus {
+  outline: none;
+  border-color: var(--focus-ring-color);
+  box-shadow: 0 0 0 2px var(--focus-ring-color);
+}

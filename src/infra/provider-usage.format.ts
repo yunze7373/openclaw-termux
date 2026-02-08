@@ -113,7 +113,11 @@ export function formatUsageReportLines(summary: UsageSummary, opts?: { now?: num
       continue;
     }
     if (entry.windows.length === 0) {
-      lines.push(`  ${entry.displayName}${planSuffix}: no data`);
+      if (entry.plan) {
+        lines.push(`  ${entry.displayName} (${entry.plan})`);
+      } else {
+        lines.push(`  ${entry.displayName}: no data`);
+      }
       continue;
     }
     lines.push(`  ${entry.displayName}${planSuffix}`);

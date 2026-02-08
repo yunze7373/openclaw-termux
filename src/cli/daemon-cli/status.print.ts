@@ -204,8 +204,12 @@ export function printDaemonStatus(status: DaemonStatus, opts: { json: boolean })
     spacer();
   }
 
+  // On Android/Termux, we use pm2, not systemd - skip systemd unavailable hints
+  const isAndroidOrTermux = process.platform === "android" || process.env.TERMUX_VERSION;
   const systemdUnavailable =
-    process.platform === "linux" && isSystemdUnavailableDetail(service.runtime?.detail);
+    process.platform === "linux" && 
+    !isAndroidOrTermux &&
+    isSystemdUnavailableDetail(service.runtime?.detail);
   if (systemdUnavailable) {
     defaultRuntime.error(errorText("systemd user services unavailable."));
     for (const hint of renderSystemdUnavailableHints({ wsl: isWSLEnv() })) {
@@ -275,7 +279,12 @@ export function printDaemonStatus(status: DaemonStatus, opts: { json: boolean })
     if (status.lastError) {
       defaultRuntime.error(`${errorText("Last gateway error:")} ${status.lastError}`);
     }
-    if (process.platform === "linux") {
+    // Termux/Android: pm2 logs (process.platform is "android" on Termux)
+    if (process.platform === "android" || (process.platform === "linux" && process.env.TERMUX_VERSION)) {
+      defaultRuntime.error(
+        errorText(`Logs: pm2 logs openclaw-gateway --lines 200`),
+      );
+    } else if (process.platform === "linux") {
       const env = (service.command?.environment ?? process.env) as NodeJS.ProcessEnv;
       const unit = resolveGatewaySystemdServiceName(env.OPENCLAW_PROFILE);
       defaultRuntime.error(
@@ -316,6 +325,6 @@ export function printDaemonStatus(status: DaemonStatus, opts: { json: boolean })
     spacer();
   }
 
-  defaultRuntime.log(`${label("Troubles:")} run ${formatCliCommand("openclaw status")}`);
+  defaultRuntime.log(`${label("Troubles:")} Check status: ${formatCliCommand("openclaw status")}`);
   defaultRuntime.log(`${label("Troubleshooting:")} https://docs.openclaw.ai/troubleshooting`);
 }

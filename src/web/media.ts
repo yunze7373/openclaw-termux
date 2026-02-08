@@ -292,6 +292,7 @@ export async function optimizeImageToJpeg(
     resizeSide: number;
     quality: number;
   } | null = null;
+  let lastError: unknown;
 
   for (const side of sides) {
     for (const quality of qualities) {
@@ -314,7 +315,8 @@ export async function optimizeImageToJpeg(
             quality,
           };
         }
-      } catch {
+      } catch (err) {
+        lastError = err;
         // Continue trying other size/quality combinations
       }
     }
@@ -329,7 +331,7 @@ export async function optimizeImageToJpeg(
     };
   }
 
-  throw new Error("Failed to optimize image");
+  throw new Error(`Failed to optimize image: ${lastError ? String(lastError) : "No valid output generated"}`);
 }
 
 export { optimizeImageToPng };

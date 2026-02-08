@@ -17,6 +17,13 @@ metadata:
               "bins": ["ffmpeg"],
               "label": "Install ffmpeg (brew)",
             },
+            {
+              "id": "apt",
+              "kind": "apt",
+              "package": "ffmpeg",
+              "bins": ["ffmpeg"],
+              "label": "Install ffmpeg (apt)",
+            },
           ],
       },
   }
@@ -31,13 +38,13 @@ Extract a single frame from a video, or create quick thumbnails for inspection.
 First frame:
 
 ```bash
-{baseDir}/scripts/frame.sh /path/to/video.mp4 --out /tmp/frame.jpg
+{baseDir}/scripts/frame.sh /path/to/video.mp4 --out "${TMPDIR:-$HOME/tmp}/frame.jpg"
 ```
 
 At a timestamp:
 
 ```bash
-{baseDir}/scripts/frame.sh /path/to/video.mp4 --time 00:00:10 --out /tmp/frame-10s.jpg
+{baseDir}/scripts/frame.sh /path/to/video.mp4 --time 00:00:10 --out "${TMPDIR:-$HOME/tmp}/frame-10s.jpg"
 ```
 
 ## Notes
