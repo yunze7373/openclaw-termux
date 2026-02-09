@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { createRequire } from "node:module";
+import os from "node:os";
 import path from "node:path";
 import { Logger as TsLogger } from "tslog";
 import type { OpenClawConfig } from "../config/types.js";
@@ -8,9 +9,9 @@ import { readLoggingConfig } from "./config.js";
 import { type LogLevel, levelToMinLevel, normalizeLogLevel } from "./levels.js";
 import { loggingState } from "./state.js";
 
-// Pin to /tmp so mac Debug UI and docs match; os.tmpdir() can be a per-user
-// randomized path on macOS which made the “Open log” button a no-op.
-export const DEFAULT_LOG_DIR = "/tmp/openclaw";
+// Use os.tmpdir() for cross-platform compatibility (Termux uses $TMPDIR, not /tmp).
+// On macOS/Linux this typically resolves to /tmp; on Termux to /data/data/com.termux/files/usr/tmp.
+export const DEFAULT_LOG_DIR = path.join(os.tmpdir(), "openclaw");
 export const DEFAULT_LOG_FILE = path.join(DEFAULT_LOG_DIR, "openclaw.log"); // legacy single-file path
 
 const LOG_PREFIX = "openclaw";
