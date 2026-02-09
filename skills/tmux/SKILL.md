@@ -2,24 +2,7 @@
 name: tmux
 description: Remote-control tmux sessions for interactive CLIs by sending keystrokes and scraping pane output.
 metadata:
-  {
-    "openclaw":
-      {
-        "emoji": "🧵",
-        "os": ["darwin", "linux", "android"],
-        "requires": { "bins": ["tmux"] },
-        "install":
-          [
-            {
-              "id": "brew",
-              "kind": "brew",
-              "formula": "tmux",
-              "bins": ["tmux"],
-              "label": "Install tmux (pkg/brew)",
-            },
-          ],
-      },
-  }
+  { "openclaw": { "emoji": "🧵", "os": ["darwin", "linux"], "requires": { "bins": ["tmux"] } } }
 ---
 
 # tmux Skill (OpenClaw)
@@ -29,9 +12,7 @@ Use tmux only when you need an interactive TTY. Prefer exec background mode for 
 ## Quickstart (isolated socket, exec tool)
 
 ```bash
-TMP_BASE="${TMPDIR:-${TERMUX_VERSION:+/data/data/com.termux/files/usr/tmp}}"
-TMP_BASE="${TMP_BASE:-/tmp}"
-SOCKET_DIR="${OPENCLAW_TMUX_SOCKET_DIR:-${CLAWDBOT_TMUX_SOCKET_DIR:-$TMP_BASE/openclaw-tmux-sockets}}"
+SOCKET_DIR="${OPENCLAW_TMUX_SOCKET_DIR:-${CLAWDBOT_TMUX_SOCKET_DIR:-${TMPDIR:-/tmp}/openclaw-tmux-sockets}}"
 mkdir -p "$SOCKET_DIR"
 SOCKET="$SOCKET_DIR/openclaw.sock"
 SESSION=openclaw-python
@@ -99,9 +80,7 @@ tmux -S "$SOCKET" send-keys -t target -l -- "$cmd" && sleep 0.1 && tmux -S "$SOC
 tmux excels at running multiple coding agents in parallel:
 
 ```bash
-TMP_BASE="${TMPDIR:-${TERMUX_VERSION:+/data/data/com.termux/files/usr/tmp}}"
-TMP_BASE="${TMP_BASE:-/tmp}"
-SOCKET="$TMP_BASE/codex-army.sock"
+SOCKET="${TMPDIR:-/tmp}/codex-army.sock"
 
 # Create multiple sessions
 for i in 1 2 3 4 5; do
@@ -109,8 +88,8 @@ for i in 1 2 3 4 5; do
 done
 
 # Launch agents in different workdirs
-tmux -S "$SOCKET" send-keys -t agent-1 "cd \"$TMP_BASE/project1\" && codex --yolo 'Fix bug X'" Enter
-tmux -S "$SOCKET" send-keys -t agent-2 "cd \"$TMP_BASE/project2\" && codex --yolo 'Fix bug Y'" Enter
+tmux -S "$SOCKET" send-keys -t agent-1 "cd /tmp/project1 && codex --yolo 'Fix bug X'" Enter
+tmux -S "$SOCKET" send-keys -t agent-2 "cd /tmp/project2 && codex --yolo 'Fix bug Y'" Enter
 
 # When sending prompts to Claude Code/Codex TUI, split text + Enter with a delay
 tmux -S "$SOCKET" send-keys -t agent-1 -l -- "Please make a small edit to README.md." && sleep 0.1 && tmux -S "$SOCKET" send-keys -t agent-1 Enter

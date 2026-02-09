@@ -17,13 +17,6 @@ metadata:
               "bins": ["camsnap"],
               "label": "Install camsnap (brew)",
             },
-            {
-              "id": "go",
-              "kind": "go",
-              "module": "github.com/steipete/camsnap/cmd/camsnap@latest",
-              "bins": ["camsnap"],
-              "label": "Install camsnap (go)",
-            },
           ],
       },
   }
@@ -36,7 +29,7 @@ Use `camsnap` to grab snapshots, clips, or motion events from configured cameras
 Setup
 
 - Config file: `~/.config/camsnap/config.yaml`
-- Add camera: `camsnap add --name kitchen --host 192.0.2.10 --user user --pass pass`
+- Add camera: `camsnap add --name kitchen --host 192.168.0.10 --user user --pass pass`
 
 Common commands
 

@@ -39,33 +39,6 @@ type AgentsAddOptions = {
   json?: boolean;
 };
 
-function isAndroidOrTermux(): boolean {
-  return process.platform === "android" || Boolean(process.env.TERMUX_VERSION);
-}
-
-function applyTermuxInstallDefaults<T extends { skills?: any }>(cfg: T): T {
-  if (!isAndroidOrTermux()) {
-    return cfg;
-  }
-  const rawInstall = cfg.skills?.install;
-  const hasPreferBrew = rawInstall && typeof rawInstall.preferBrew === "boolean";
-  const hasNodeManager = rawInstall && typeof rawInstall.nodeManager === "string";
-  if (hasPreferBrew && hasNodeManager) {
-    return cfg;
-  }
-  return {
-    ...cfg,
-    skills: {
-      ...cfg.skills,
-      install: {
-        ...(rawInstall ?? {}),
-        ...(hasPreferBrew ? {} : { preferBrew: false }),
-        ...(hasNodeManager ? {} : { nodeManager: "npm" }),
-      },
-    },
-  };
-}
-
 async function fileExists(pathname: string): Promise<boolean> {
   try {
     await fs.stat(pathname);
@@ -80,11 +53,10 @@ export async function agentsAddCommand(
   runtime: RuntimeEnv = defaultRuntime,
   params?: { hasFlags?: boolean },
 ) {
-  const loaded = await requireValidConfig(runtime);
-  if (!loaded) {
+  const cfg = await requireValidConfig(runtime);
+  if (!cfg) {
     return;
   }
-  const cfg = applyTermuxInstallDefaults(loaded);
 
   const workspaceFlag = opts.workspace?.trim();
   const nameInput = opts.name?.trim();

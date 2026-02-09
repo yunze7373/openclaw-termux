@@ -43,7 +43,7 @@ import {
   buildDockerExecArgs,
   buildSandboxEnv,
   chunkString,
-  clampNumber,
+  clampWithDefault,
   coerceEnv,
   killSession,
   readEnvInt,
@@ -105,21 +105,20 @@ function validateHostEnv(env: Record<string, string>): void {
     }
   }
 }
-const DEFAULT_MAX_OUTPUT = clampNumber(
+const DEFAULT_MAX_OUTPUT = clampWithDefault(
   readEnvInt("PI_BASH_MAX_OUTPUT_CHARS"),
   200_000,
   1_000,
   200_000,
 );
-const DEFAULT_PENDING_MAX_OUTPUT = clampNumber(
+const DEFAULT_PENDING_MAX_OUTPUT = clampWithDefault(
   readEnvInt("OPENCLAW_BASH_PENDING_MAX_OUTPUT_CHARS"),
   200_000,
   1_000,
   200_000,
 );
 const DEFAULT_PATH =
-  process.env.PATH ??
-  "/data/data/com.termux/files/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+  process.env.PATH ?? "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const DEFAULT_NOTIFY_TAIL_CHARS = 400;
 const DEFAULT_APPROVAL_TIMEOUT_MS = 120_000;
 const DEFAULT_APPROVAL_REQUEST_TIMEOUT_MS = 130_000;
@@ -475,14 +474,9 @@ async function runExecProcess(opts: {
     });
     child = spawned as ChildProcessWithoutNullStreams;
     stdin = child.stdin;
-  } else if (opts.usePty && process.platform !== "android") {
+  } else if (opts.usePty) {
     const { shell, args: shellArgs } = getShellConfig();
     try {
-      // Explicitly guard against loading node-pty on Android to prevent
-      // "Cannot find module .../pty.node" crashes at runtime.
-      if (process.env.TERMUX_VERSION || (process.platform as string) === "android") {
-        throw new Error("PTY not supported on Android");
-      }
       const ptyModule = (await import("@lydell/node-pty")) as unknown as {
         spawn?: PtySpawn;
         default?: { spawn?: PtySpawn };
@@ -738,7 +732,6 @@ async function runExecProcess(opts: {
               ? "Command aborted before exit code was captured"
               : `Command exited with code ${code}`;
         const message = aggregated ? `${aggregated}\n\n${reason}` : reason;
-        const contextMessage = `Command "${opts.command}" failed:\n${message}`;
         settle({
           status: "failed",
           exitCode: code ?? null,
@@ -746,7 +739,7 @@ async function runExecProcess(opts: {
           durationMs,
           aggregated,
           timedOut,
-          reason: contextMessage,
+          reason: message,
         });
         return;
       }
@@ -808,7 +801,7 @@ export function createExecTool(
   defaults?: ExecToolDefaults,
   // oxlint-disable-next-line typescript/no-explicit-any
 ): AgentTool<any, ExecToolDetails> {
-  const defaultBackgroundMs = clampNumber(
+  const defaultBackgroundMs = clampWithDefault(
     defaults?.backgroundMs ?? readEnvInt("PI_BASH_YIELD_MS"),
     10_000,
     10,
@@ -867,7 +860,12 @@ export function createExecTool(
       const yieldWindow = allowBackground
         ? backgroundRequested
           ? 0
-          : clampNumber(params.yieldMs ?? defaultBackgroundMs, defaultBackgroundMs, 10, 120_000)
+          : clampWithDefault(
+              params.yieldMs ?? defaultBackgroundMs,
+              defaultBackgroundMs,
+              10,
+              120_000,
+            )
         : null;
       const elevatedDefaults = defaults?.elevated;
       const elevatedAllowed = Boolean(elevatedDefaults?.enabled && elevatedDefaults.allowed);

@@ -7,7 +7,7 @@ metadata:
     "openclaw":
       {
         "emoji": "🗣️",
-        "requires": { "bins": ["sag", "mpv"], "env": ["ELEVENLABS_API_KEY"] },
+        "requires": { "bins": ["sag"], "env": ["ELEVENLABS_API_KEY"] },
         "primaryEnv": "ELEVENLABS_API_KEY",
         "install":
           [
@@ -17,20 +17,6 @@ metadata:
               "formula": "steipete/tap/sag",
               "bins": ["sag"],
               "label": "Install sag (brew)",
-            },
-            {
-              "id": "uv",
-              "kind": "uv",
-              "package": "sag",
-              "bins": ["sag"],
-              "label": "Install sag (uv)",
-            },
-            {
-              "id": "pip",
-              "kind": "pip",
-              "package": "sag",
-              "bins": ["sag"],
-              "label": "Install sag (pip)",
             },
           ],
       },

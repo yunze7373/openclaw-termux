@@ -35,8 +35,7 @@ export {
 
 export function resolveSkillsInstallPreferences(config?: OpenClawConfig): SkillsInstallPreferences {
   const raw = config?.skills?.install;
-  const isTermuxAndroid = process.platform === "android" || Boolean(process.env.TERMUX_VERSION);
-  const preferBrew = raw?.preferBrew ?? !isTermuxAndroid;
+  const preferBrew = raw?.preferBrew ?? true;
   const managerRaw = typeof raw?.nodeManager === "string" ? raw.nodeManager.trim() : "";
   const manager = managerRaw.toLowerCase();
   const nodeManager: SkillsInstallPreferences["nodeManager"] =

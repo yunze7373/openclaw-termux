@@ -20,9 +20,7 @@ socket_name=""
 socket_path=""
 query=""
 scan_all=false
-tmp_base="${TMPDIR:-${TERMUX_VERSION:+/data/data/com.termux/files/usr/tmp}}"
-tmp_base="${tmp_base:-/tmp}"
-socket_dir="${OPENCLAW_TMUX_SOCKET_DIR:-${CLAWDBOT_TMUX_SOCKET_DIR:-$tmp_base/openclaw-tmux-sockets}}"
+socket_dir="${OPENCLAW_TMUX_SOCKET_DIR:-${CLAWDBOT_TMUX_SOCKET_DIR:-${TMPDIR:-/tmp}/openclaw-tmux-sockets}}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

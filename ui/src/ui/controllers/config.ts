@@ -97,10 +97,6 @@ export function applyConfigSnapshot(state: ConfigState, snapshot: ConfigSnapshot
     state.configFormOriginal = cloneConfigObject(snapshot.config ?? {});
     state.configRawOriginal = rawFromSnapshot;
   }
-
-  if (snapshot.config && (snapshot.config as any).models && (snapshot.config as any).models.providers) {
-    state.modelProviders = (snapshot.config as any).models.providers;
-  }
 }
 
 export async function saveConfig(state: ConfigState) {

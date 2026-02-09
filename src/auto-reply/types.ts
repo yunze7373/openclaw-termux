@@ -39,8 +39,6 @@ export type GetReplyOptions = {
   blockReplyTimeoutMs?: number;
   /** If provided, only load these skills for this session (empty = no skills). */
   skillFilter?: string[];
-  /** Override the model ID for this request. */
-  modelOverride?: string;
   /** Mutable ref to track if a reply was sent (for Slack "first" threading mode). */
   hasRepliedRef?: { value: boolean };
 };

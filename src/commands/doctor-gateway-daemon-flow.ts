@@ -157,13 +157,6 @@ export async function maybeRepairGatewayDaemon(params: {
       }
     }
     note("Gateway service not installed.", "Gateway");
-    if (process.platform === "android") {
-      note(
-        "Service installation is not supported on Android. Run manually: 'openclaw gateway start' (or 'pnpm start gateway').",
-        "Gateway",
-      );
-      return;
-    }
     if (params.cfg.gateway?.mode !== "remote") {
       const install = await params.prompter.confirmSkipInNonInteractive({
         message: "Install gateway service now?",

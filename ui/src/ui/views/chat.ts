@@ -68,9 +68,6 @@ export type ChatProps = {
   onCloseSidebar?: () => void;
   onSplitRatioChange?: (ratio: number) => void;
   onChatScroll?: (event: Event) => void;
-  modelProviders: Record<string, any> | null;
-  selectedModelId: string | null;
-  onModelChange: (modelId: string) => void;
 };
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
@@ -88,7 +85,7 @@ function renderCompactionIndicator(status: CompactionIndicatorStatus | null | un
   // Show "compacting..." while active
   if (status.active) {
     return html`
-      <div class="callout info compaction-indicator compaction-indicator--active">
+      <div class="compaction-indicator compaction-indicator--active" role="status" aria-live="polite">
         ${icons.loader} Compacting context...
       </div>
     `;
@@ -99,7 +96,7 @@ function renderCompactionIndicator(status: CompactionIndicatorStatus | null | un
     const elapsed = Date.now() - status.completedAt;
     if (elapsed < COMPACTION_TOAST_DURATION_MS) {
       return html`
-        <div class="callout success compaction-indicator compaction-indicator--complete">
+        <div class="compaction-indicator compaction-indicator--complete" role="status" aria-live="polite">
           ${icons.check} Context compacted
         </div>
       `;
@@ -227,6 +224,16 @@ export function renderChat(props: ChatProps) {
         buildChatItems(props),
         (item) => item.key,
         (item) => {
+          if (item.kind === "divider") {
+            return html`
+              <div class="chat-divider" role="separator" data-ts=${String(item.timestamp)}>
+                <span class="chat-divider__line"></span>
+                <span class="chat-divider__label">${item.label}</span>
+                <span class="chat-divider__line"></span>
+              </div>
+            `;
+          }
+
           if (item.kind === "reading-indicator") {
             return renderReadingIndicatorGroup(assistantIdentity);
           }
@@ -260,8 +267,6 @@ export function renderChat(props: ChatProps) {
       ${props.disabledReason ? html`<div class="callout">${props.disabledReason}</div>` : nothing}
 
       ${props.error ? html`<div class="callout danger">${props.error}</div>` : nothing}
-
-      ${renderCompactionIndicator(props.compactionStatus)}
 
       ${
         props.focusMode
@@ -346,6 +351,8 @@ export function renderChat(props: ChatProps) {
           : nothing
       }
 
+      ${renderCompactionIndicator(props.compactionStatus)}
+
       ${
         props.showNewMessages
           ? html`
@@ -397,7 +404,6 @@ export function renderChat(props: ChatProps) {
             ></textarea>
           </label>
           <div class="chat-compose__actions">
-            ${renderModelSelector(props)}
             <button
               class="btn"
               ?disabled=${!props.connected || (!canAbort && props.sending)}
@@ -481,6 +487,20 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   for (let i = historyStart; i < history.length; i++) {
     const msg = history[i];
     const normalized = normalizeMessage(msg);
+    const raw = msg as Record<string, unknown>;
+    const marker = raw.__openclaw as Record<string, unknown> | undefined;
+    if (marker && marker.kind === "compaction") {
+      items.push({
+        kind: "divider",
+        key:
+          typeof marker.id === "string"
+            ? `divider:compaction:${marker.id}`
+            : `divider:compaction:${normalized.timestamp}:${i}`,
+        label: "Compaction",
+        timestamp: normalized.timestamp ?? Date.now(),
+      });
+      continue;
+    }
 
     if (!props.showThinking && normalized.role.toLowerCase() === "toolresult") {
       continue;
@@ -539,100 +559,4 @@ function messageKey(message: unknown, index: number): string {
     return `msg:${role}:${timestamp}:${index}`;
   }
   return `msg:${role}:${index}`;
-}
-
-function getCostIcon(cost: any) {
-  const inputCost = cost?.input ?? -1;
-  if (inputCost === 0) return '🎁';
-  if (inputCost > 0 && inputCost <= 0.33) return '💎';
-  if (inputCost > 0.33 && inputCost <= 1) return '💎';
-  if (inputCost > 1) return '🔥';
-  return '';
-}
-
-function renderModelSelector(props: ChatProps) {
-  if (!props.modelProviders) {
-    return nothing;
-  }
-
-  const providers = Object.entries(props.modelProviders);
-  const copilotEntry = providers.find(([id]) => id === 'github-copilot');
-  const otherProviders = providers.filter(([id]) => id !== 'github-copilot');
-
-  // Sort other providers alphabetically
-  otherProviders.sort((a, b) => a[0].localeCompare(b[0]));
-
-  const renderCopilotGroups = () => {
-    if (!copilotEntry) return nothing;
-    const [providerId, providerData] = copilotEntry;
-    const provider = providerData as { models: any[], name?: string };
-
-    const groups: Record<string, any[]> = {
-      '0x': [],
-      '0.33x': [],
-      '1x': [],
-      '3x': []
-    };
-    const otherModels: any[] = [];
-
-    provider.models.forEach((model: any) => {
-      if (model.name.includes('(0x)')) groups['0x'].push(model);
-      else if (model.name.includes('(0.33x)')) groups['0.33x'].push(model);
-      else if (model.name.includes('(1x)')) groups['1x'].push(model);
-      else if (model.name.includes('(3x)')) groups['3x'].push(model);
-      else otherModels.push(model);
-    });
-
-    // Merge uncategorized models into 1x (Standard) as a fallback
-    groups['1x'].push(...otherModels);
-
-    const groupConfig = [
-      { key: '0x', label: '🎁 GitHub Copilot (Free)', emoji: '🎁' },
-      { key: '0.33x', label: '💎 GitHub Copilot (Economy)', emoji: '💎' },
-      { key: '1x', label: '⚡ GitHub Copilot (Standard)', emoji: '⚡' },
-      { key: '3x', label: '🔥 GitHub Copilot (Pro)', emoji: '🔥' }
-    ];
-
-    return groupConfig.map(config => {
-      const models = groups[config.key];
-      if (!models || models.length === 0) return nothing;
-
-      // Sort models alphabetically
-      models.sort((a, b) => a.name.localeCompare(b.name));
-
-      return html`
-        <optgroup label="${config.label}">
-          ${models.map((model: any) => {
-            const cleanName = model.name
-              .replace(/^GitHub Copilot: /, '')
-              .replace(/ \(\d+(\.\d+)?x\)$/, '')
-              .replace(/ \(Preview\)/, ' (Preview)');
-            
-            const label = `${config.emoji} ${cleanName}`;
-            const modelId = `${providerId}/${model.id}`;
-            return html`<option value=${modelId} ?selected=${modelId === props.selectedModelId}>${label}</option>`;
-          })}
-        </optgroup>
-      `;
-    });
-  };
-
-  return html`
-    <select class="model-selector" @change=${(e: Event) => props.onModelChange((e.target as HTMLSelectElement).value)}>
-      <option value="">Default Model</option>
-      ${renderCopilotGroups()}
-      ${otherProviders.map(([providerId, providerData]) => {
-        const provider = providerData as { models: any[], name?: string };
-        return html`
-          <optgroup label="${provider.name || providerId}">
-            ${provider.models.map((model: any) => {
-              const name = (model.name || model.id).replace(/^GitHub Copilot: /, '');
-              const modelId = `${providerId}/${model.id}`;
-              return html`<option value=${modelId} ?selected=${modelId === props.selectedModelId}>${name}</option>`;
-            })}
-          </optgroup>
-        `;
-      })}
-    </select>
-  `;
 }

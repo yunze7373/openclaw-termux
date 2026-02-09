@@ -44,7 +44,6 @@ import { ensureOpenClawCliOnPath } from "../infra/path-env.js";
 import { detectMime } from "../media/mime.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
 import { VERSION } from "../version.js";
-import { sendAndroidNotification } from "../platform/android/notify.js";
 import { ensureNodeHostConfig, saveNodeHostConfig, type NodeHostGatewayConfig } from "./config.js";
 
 type NodeHostRunOptions = {
@@ -72,14 +71,6 @@ type SystemRunParams = {
 
 type SystemWhichParams = {
   bins: string[];
-};
-
-type SystemNotifyParams = {
-  title?: string;
-  body?: string;
-  sound?: string;
-  priority?: "passive" | "active" | "timeSensitive";
-  delivery?: "system" | "overlay" | "auto";
 };
 
 type BrowserProxyParams = {
@@ -164,8 +155,7 @@ type NodeInvokeRequestPayload = {
 
 const OUTPUT_CAP = 200_000;
 const OUTPUT_EVENT_TAIL = 20_000;
-const DEFAULT_NODE_PATH =
-  "/data/data/com.termux/files/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+const DEFAULT_NODE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const BROWSER_PROXY_MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 const execHostEnforced = process.env.OPENCLAW_NODE_EXEC_HOST?.trim().toLowerCase() === "app";
@@ -589,10 +579,6 @@ export async function runNodeHost(opts: NodeHostRunOptions): Promise<void> {
   const browserProxy = resolveBrowserProxyConfig();
   const resolvedBrowser = resolveBrowserConfig(cfg.browser, cfg);
   const browserProxyEnabled = browserProxy.enabled && resolvedBrowser.enabled;
-  const notifySupported =
-    process.platform === "darwin" ||
-    process.platform === "android" ||
-    Boolean(process.env.TERMUX_VERSION);
   const isRemoteMode = cfg.gateway?.mode === "remote";
   const token =
     process.env.OPENCLAW_GATEWAY_TOKEN?.trim() ||
@@ -625,7 +611,6 @@ export async function runNodeHost(opts: NodeHostRunOptions): Promise<void> {
     commands: [
       "system.run",
       "system.which",
-      ...(notifySupported ? ["system.notify"] : []),
       "system.execApprovals.get",
       "system.execApprovals.set",
       ...(browserProxyEnabled ? ["browser.proxy"] : []),
@@ -751,60 +736,6 @@ async function handleInvoke(
         ok: true,
         payloadJSON: JSON.stringify(payload),
       });
-    } catch (err) {
-      await sendInvokeResult(client, frame, {
-        ok: false,
-        error: { code: "INVALID_REQUEST", message: String(err) },
-      });
-    }
-    return;
-  }
-
-  if (command === "system.notify") {
-    try {
-      const params = decodeParams<SystemNotifyParams>(frame.paramsJSON);
-      const title = typeof params.title === "string" ? params.title.trim() : "";
-      const body = typeof params.body === "string" ? params.body.trim() : "";
-      if (!title && !body) {
-        throw new Error("INVALID_REQUEST: missing title/body");
-      }
-
-      if (process.platform === "android" || Boolean(process.env.TERMUX_VERSION)) {
-        const result = await sendAndroidNotification({
-          title,
-          body,
-          sound: params.sound,
-          priority: params.priority,
-        });
-        if (!result.ok) {
-          throw new Error(result.stderr || "notify failed");
-        }
-        await sendInvokeResult(client, frame, {
-          ok: true,
-          payloadJSON: JSON.stringify({ ok: true }),
-        });
-        return;
-      }
-
-      if (process.platform === "darwin") {
-        const escapedTitle = title.replace(/\\\\/g, "\\\\\\\\").replace(/"/g, '\\"');
-        const escapedBody = body.replace(/\\\\/g, "\\\\\\\\").replace(/"/g, '\\"');
-        const script = params.sound
-          ? `display notification "${escapedBody}" with title "${escapedTitle}" sound name "${String(params.sound).replace(/\\\\/g, "\\\\\\\\").replace(/"/g, '\\"')}"`
-          : `display notification "${escapedBody}" with title "${escapedTitle}"`;
-        const env = sanitizeEnv(undefined);
-        const res = await runCommand(["osascript", "-e", script], undefined, env, 5_000);
-        if (!res.success) {
-          throw new Error(res.stderr || res.error || "notify failed");
-        }
-        await sendInvokeResult(client, frame, {
-          ok: true,
-          payloadJSON: JSON.stringify({ ok: true }),
-        });
-        return;
-      }
-
-      throw new Error(`UNAVAILABLE: notifications not supported on ${process.platform}`);
     } catch (err) {
       await sendInvokeResult(client, frame, {
         ok: false,

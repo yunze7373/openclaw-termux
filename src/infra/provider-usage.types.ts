@@ -19,12 +19,10 @@ export type UsageSummary = {
 
 export type UsageProviderId =
   | "anthropic"
-  | "deepseek"
   | "github-copilot"
   | "google-gemini-cli"
   | "google-antigravity"
   | "minimax"
-  | "moonshot"
   | "openai-codex"
   | "xiaomi"
   | "zai";

@@ -271,7 +271,6 @@ export async function createModelSelectionState(params: {
   provider: string;
   model: string;
   hasModelDirective: boolean;
-  ignoreStoredOverride?: boolean;
 }): Promise<ModelSelectionState> {
   const {
     cfg,
@@ -283,21 +282,18 @@ export async function createModelSelectionState(params: {
     storePath,
     defaultProvider,
     defaultModel,
-    ignoreStoredOverride,
   } = params;
 
   let provider = params.provider;
   let model = params.model;
 
   const hasAllowlist = agentCfg?.models && Object.keys(agentCfg.models).length > 0;
-  const initialStoredOverride = ignoreStoredOverride
-    ? null
-    : resolveStoredModelOverride({
-        sessionEntry,
-        sessionStore,
-        sessionKey,
-        parentSessionKey,
-      });
+  const initialStoredOverride = resolveStoredModelOverride({
+    sessionEntry,
+    sessionStore,
+    sessionKey,
+    parentSessionKey,
+  });
   const hasStoredOverride = Boolean(initialStoredOverride);
   const needsModelCatalog = params.hasModelDirective || hasAllowlist || hasStoredOverride;
 
@@ -341,14 +337,12 @@ export async function createModelSelectionState(params: {
     }
   }
 
-  const storedOverride = ignoreStoredOverride
-    ? null
-    : resolveStoredModelOverride({
-        sessionEntry,
-        sessionStore,
-        sessionKey,
-        parentSessionKey,
-      });
+  const storedOverride = resolveStoredModelOverride({
+    sessionEntry,
+    sessionStore,
+    sessionKey,
+    parentSessionKey,
+  });
   if (storedOverride?.model) {
     const candidateProvider = storedOverride.provider || defaultProvider;
     const key = modelKey(candidateProvider, storedOverride.model);
@@ -584,9 +578,7 @@ export function resolveContextTokens(params: {
   agentCfg: NonNullable<NonNullable<OpenClawConfig["agents"]>["defaults"]> | undefined;
   model: string;
 }): number {
-  const modelContext = lookupContextTokens(params.model);
-  // Prioritize the model's native context window over the global default setting.
   return (
-    modelContext ?? params.agentCfg?.contextTokens ?? DEFAULT_CONTEXT_TOKENS
+    params.agentCfg?.contextTokens ?? lookupContextTokens(params.model) ?? DEFAULT_CONTEXT_TOKENS
   );
 }

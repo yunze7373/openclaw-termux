@@ -11,24 +11,21 @@ metadata:
         "install":
           [
             {
-              "id": "spogo-brew",
+              "id": "brew",
               "kind": "brew",
               "formula": "spogo",
               "tap": "steipete/tap",
               "bins": ["spogo"],
               "label": "Install spogo (brew)",
-              "os": ["darwin"],
             },
             {
-              "id": "spotify_player-brew",
+              "id": "brew",
               "kind": "brew",
               "formula": "spotify_player",
               "bins": ["spotify_player"],
               "label": "Install spotify_player (brew)",
-              "os": ["darwin"],
             },
           ],
-        "note": "On Termux: cargo install spotify_player",
       },
   }
 ---

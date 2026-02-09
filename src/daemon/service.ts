@@ -9,16 +9,6 @@ import {
   uninstallLaunchAgent,
 } from "./launchd.js";
 import {
-  installPm2Process,
-  isPm2ProcessRunning,
-  isTermux,
-  readPm2ProcessCommand,
-  readPm2ProcessRuntime,
-  restartPm2Process,
-  stopPm2Process,
-  uninstallPm2Process,
-} from "./pm2.js";
-import {
   installScheduledTask,
   isScheduledTaskInstalled,
   readScheduledTaskCommand,
@@ -103,38 +93,6 @@ export function resolveGatewayService(): GatewayService {
     };
   }
 
-  // Termux/Android: use pm2 instead of systemd
-  // Check this BEFORE the generic Linux check
-  // Note: process.platform is "android" on Termux, not "linux"
-  if (process.platform === "android" || (process.platform === "linux" && isTermux())) {
-    return {
-      label: "pm2",
-      loadedText: "running",
-      notLoadedText: "stopped",
-      install: async (args) => {
-        await installPm2Process(args);
-      },
-      uninstall: async (args) => {
-        await uninstallPm2Process(args);
-      },
-      stop: async (args) => {
-        await stopPm2Process({
-          stdout: args.stdout,
-          env: args.env,
-        });
-      },
-      restart: async (args) => {
-        await restartPm2Process({
-          stdout: args.stdout,
-          env: args.env,
-        });
-      },
-      isLoaded: async (args) => isPm2ProcessRunning(args),
-      readCommand: readPm2ProcessCommand,
-      readRuntime: readPm2ProcessRuntime,
-    };
-  }
-
   if (process.platform === "linux") {
     return {
       label: "systemd",
@@ -190,25 +148,6 @@ export function resolveGatewayService(): GatewayService {
       isLoaded: async (args) => isScheduledTaskInstalled(args),
       readCommand: readScheduledTaskCommand,
       readRuntime: async (env) => await readScheduledTaskRuntime(env),
-    };
-  }
-
-  if (process.platform === "android") {
-    return {
-      label: "Manual (Android)",
-      loadedText: "active",
-      notLoadedText: "inactive",
-      install: async () => {
-        throw new Error(
-          "Automatic service installation is not supported on Android. Please run the gateway manually using 'openclaw gateway start'.",
-        );
-      },
-      uninstall: async () => {},
-      stop: async () => {},
-      restart: async () => {},
-      isLoaded: async () => false,
-      readCommand: async () => null,
-      readRuntime: async () => ({ status: "stopped", pid: undefined }),
     };
   }
 

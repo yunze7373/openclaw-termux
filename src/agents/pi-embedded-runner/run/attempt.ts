@@ -49,6 +49,7 @@ import { resolveSandboxRuntimeStatus } from "../../sandbox/runtime-status.js";
 import { repairSessionFileIfNeeded } from "../../session-file-repair.js";
 import { guardSessionManager } from "../../session-tool-result-guard-wrapper.js";
 import { acquireSessionWriteLock } from "../../session-write-lock.js";
+import { detectRuntimeShell } from "../../shell-utils.js";
 import {
   applySkillEnvOverrides,
   applySkillEnvOverridesFromSnapshot,
@@ -143,11 +144,8 @@ export async function runEmbeddedAttempt(
   const prevCwd = process.cwd();
   const runAbortController = new AbortController();
 
-  // [MOD] Make API requests explicit in logs
-  console.info(
-    `[API Request] Starting: runId=${params.runId} session=${params.sessionKey || params.sessionId} ` +
-    `model=${params.provider}/${params.modelId} url=${params.model.baseUrl || "default"} ` +
-    `thinking=${params.thinkLevel}`
+  log.debug(
+    `embedded run start: runId=${params.runId} sessionId=${params.sessionId} provider=${params.provider} model=${params.modelId} thinking=${params.thinkLevel} messageChannel=${params.messageChannel ?? params.messageProvider ?? "unknown"}`,
   );
 
   await fs.mkdir(resolvedWorkspace, { recursive: true });
@@ -334,6 +332,7 @@ export async function runEmbeddedAttempt(
         node: process.version,
         model: `${params.provider}/${params.modelId}`,
         defaultModel: defaultModelLabel,
+        shell: detectRuntimeShell(),
         channel: runtimeChannel,
         capabilities: runtimeCapabilities,
         channelActions,
@@ -651,6 +650,8 @@ export async function runEmbeddedAttempt(
         getMessagingToolSentTargets,
         didSendViaMessagingTool,
         getLastToolError,
+        getUsageTotals,
+        getCompactionCount,
       } = subscription;
 
       const queueHandle: EmbeddedPiQueueHandle = {
@@ -668,8 +669,8 @@ export async function runEmbeddedAttempt(
       const abortTimer = setTimeout(
         () => {
           if (!isProbeSession) {
-            console.warn(
-              `[API Timeout] Request timed out: runId=${params.runId} sessionId=${params.sessionId} timeoutMs=${params.timeoutMs} model=${params.provider}/${params.modelId}`
+            log.warn(
+              `embedded run timeout: runId=${params.runId} sessionId=${params.sessionId} timeoutMs=${params.timeoutMs}`,
             );
           }
           abortRun(true);
@@ -815,13 +816,11 @@ export async function runEmbeddedAttempt(
 
           // Only pass images option if there are actually images to pass
           // This avoids potential issues with models that don't expect the images parameter
-          console.info(`[API Request] Sending prompt to ${params.provider}/${params.modelId}...`);
           if (imageResult.images.length > 0) {
             await abortable(activeSession.prompt(effectivePrompt, { images: imageResult.images }));
           } else {
             await abortable(activeSession.prompt(effectivePrompt));
           }
-          console.info(`[API Request] Received response from ${params.provider}/${params.modelId}`);
         } catch (err) {
           promptError = err;
         } finally {
@@ -911,6 +910,8 @@ export async function runEmbeddedAttempt(
         cloudCodeAssistFormatError: Boolean(
           lastAssistant?.errorMessage && isCloudCodeAssistFormatError(lastAssistant.errorMessage),
         ),
+        attemptUsage: getUsageTotals(),
+        compactionCount: getCompactionCount(),
         // Client tool call detected (OpenResponses hosted tools)
         clientToolCall: clientToolCallDetected ?? undefined,
       };

@@ -16,17 +16,8 @@ metadata:
               "formula": "himalaya",
               "bins": ["himalaya"],
               "label": "Install Himalaya (brew)",
-              "os": ["darwin"],
-            },
-            {
-              "id": "cargo",
-              "kind": "cargo",
-              "package": "himalaya",
-              "bins": ["himalaya"],
-              "label": "Install Himalaya (cargo)",
             },
           ],
-        "note": "On Termux: pkg install rust && cargo install himalaya",
       },
   }
 ---

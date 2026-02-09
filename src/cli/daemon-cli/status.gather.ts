@@ -185,7 +185,7 @@ export async function gatherDaemonStatus(
   const probeUrl = probeUrlOverride ?? `ws://${probeHost}:${daemonPort}`;
   const probeNote =
     !probeUrlOverride && bindMode === "lan"
-      ? "Local probe uses loopback (127.0.0.1). bind=lan listens on 0.0.0.0 (all interfaces); use a LAN IP for remote clients."
+      ? `bind=lan listens on 0.0.0.0 (all interfaces); probing via ${probeHost}.`
       : !probeUrlOverride && bindMode === "loopback"
         ? "Loopback-only gateway; only local clients can connect."
         : undefined;
@@ -236,12 +236,6 @@ export async function gatherDaemonStatus(
         configPath: daemonConfigSummary.path,
       })
     : undefined;
-
-  // On Android, there is no service manager, so "service.loaded" is always false.
-  // If RPC is successful, we know the gateway is running manually.
-  if (process.platform === "android" && rpc?.ok && runtime) {
-    runtime.status = "running (manual)";
-  }
 
   let lastError: string | undefined;
   if (loaded && runtime?.status === "running" && portStatus && portStatus.status !== "busy") {

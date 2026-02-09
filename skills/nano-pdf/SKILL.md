@@ -17,13 +17,6 @@ metadata:
               "bins": ["nano-pdf"],
               "label": "Install nano-pdf (uv)",
             },
-            {
-              "id": "pip",
-              "kind": "pip",
-              "package": "nano-pdf",
-              "bins": ["nano-pdf"],
-              "label": "Install nano-pdf (pip)",
-            },
           ],
       },
   }
@@ -43,4 +36,3 @@ Notes:
 
 - Page numbers are 0-based or 1-based depending on the tool’s version/config; if the result looks off by one, retry with the other.
 - Always sanity-check the output PDF before sending it out.
-- **Termux Note**: Installation requires compiling Rust extensions. Ensure you have `rust`, `python`, `build-essential`, and `clang` installed (`pkg install rust python build-essential clang`). If `uv` fails, try `pip install nano-pdf` manually.

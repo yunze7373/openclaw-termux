@@ -3,35 +3,7 @@ name: coding-agent
 description: Run Codex CLI, Claude Code, OpenCode, or Pi Coding Agent via background process for programmatic control.
 metadata:
   {
-    "openclaw":
-      {
-        "emoji": "🧩",
-        "requires": { "anyBins": ["claude", "codex", "opencode", "pi"] },
-        "install":
-          [
-            {
-              "id": "pi-npm",
-              "kind": "node",
-              "package": "@mariozechner/pi-coding-agent",
-              "bins": ["pi"],
-              "label": "Install Pi Coding Agent (npm)",
-            },
-            {
-              "id": "codex-npm",
-              "kind": "node",
-              "package": "@openai/codex",
-              "bins": ["codex"],
-              "label": "Install Codex CLI (npm)",
-            },
-            {
-              "id": "claude-npm",
-              "kind": "node",
-              "package": "@anthropic-ai/claude-code",
-              "bins": ["claude"],
-              "label": "Install Claude Code (npm)",
-            },
-          ],
-      },
+    "openclaw": { "emoji": "🧩", "requires": { "anyBins": ["claude", "codex", "opencode", "pi"] } },
   }
 ---
 
@@ -42,8 +14,6 @@ Use **bash** (with optional background mode) for all coding agent work. Simple a
 ## ⚠️ PTY Mode Required!
 
 Coding agents (Codex, Claude Code, Pi) are **interactive terminal applications** that need a pseudo-terminal (PTY) to work correctly. Without PTY, you'll get broken output, missing colors, or the agent may hang.
-
-**On Termux:** The installer automatically creates wrapper shims (`~/.local/bin/codex`, `~/.local/bin/claude`) that handle `termux-chroot` and SSL certificates for you. Just run them normally.
 
 **Always use `pty:true`** when running coding agents:
 
@@ -290,7 +260,7 @@ For long-running background tasks, append a wake trigger to your prompt so OpenC
 ... your task here.
 
 When completely finished, run this command to notify me:
-openclaw gateway wake --text "Done: [brief summary of what was built]" --mode now
+openclaw system event --text "Done: [brief summary of what was built]" --mode now
 ```
 
 **Example:**
@@ -298,7 +268,7 @@ openclaw gateway wake --text "Done: [brief summary of what was built]" --mode no
 ```bash
 bash pty:true workdir:~/project background:true command:"codex --yolo exec 'Build a REST API for todos.
 
-When completely finished, run: openclaw gateway wake --text \"Done: Built todos REST API with CRUD endpoints\" --mode now'"
+When completely finished, run: openclaw system event --text \"Done: Built todos REST API with CRUD endpoints\" --mode now'"
 ```
 
 This triggers an immediate wake event — Skippy gets pinged in seconds, not 10 minutes.

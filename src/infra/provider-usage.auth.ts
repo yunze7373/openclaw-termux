@@ -11,6 +11,7 @@ import {
 import { getCustomProviderApiKey, resolveEnvApiKey } from "../agents/model-auth.js";
 import { normalizeProviderId } from "../agents/model-selection.js";
 import { loadConfig } from "../config/config.js";
+import { normalizeSecretInput } from "../utils/normalize-secret-input.js";
 
 export type ProviderAuth = {
   provider: UsageProviderId;
@@ -34,7 +35,8 @@ function parseGoogleToken(apiKey: string): { token: string } | null {
 }
 
 function resolveZaiApiKey(): string | undefined {
-  const envDirect = process.env.ZAI_API_KEY?.trim() || process.env.Z_AI_API_KEY?.trim();
+  const envDirect =
+    normalizeSecretInput(process.env.ZAI_API_KEY) || normalizeSecretInput(process.env.Z_AI_API_KEY);
   if (envDirect) {
     return envDirect;
   }
@@ -57,8 +59,8 @@ function resolveZaiApiKey(): string | undefined {
   ].find((id) => store.profiles[id]?.type === "api_key");
   if (apiProfile) {
     const cred = store.profiles[apiProfile];
-    if (cred?.type === "api_key" && cred.key?.trim()) {
-      return cred.key.trim();
+    if (cred?.type === "api_key" && normalizeSecretInput(cred.key)) {
+      return normalizeSecretInput(cred.key);
     }
   }
 
@@ -79,7 +81,8 @@ function resolveZaiApiKey(): string | undefined {
 
 function resolveMinimaxApiKey(): string | undefined {
   const envDirect =
-    process.env.MINIMAX_CODE_PLAN_KEY?.trim() || process.env.MINIMAX_API_KEY?.trim();
+    normalizeSecretInput(process.env.MINIMAX_CODE_PLAN_KEY) ||
+    normalizeSecretInput(process.env.MINIMAX_API_KEY);
   if (envDirect) {
     return envDirect;
   }
@@ -104,17 +107,17 @@ function resolveMinimaxApiKey(): string | undefined {
     return undefined;
   }
   const cred = store.profiles[apiProfile];
-  if (cred?.type === "api_key" && cred.key?.trim()) {
-    return cred.key.trim();
+  if (cred?.type === "api_key" && normalizeSecretInput(cred.key)) {
+    return normalizeSecretInput(cred.key);
   }
-  if (cred?.type === "token" && cred.token?.trim()) {
-    return cred.token.trim();
+  if (cred?.type === "token" && normalizeSecretInput(cred.token)) {
+    return normalizeSecretInput(cred.token);
   }
   return undefined;
 }
 
 function resolveXiaomiApiKey(): string | undefined {
-  const envDirect = process.env.XIAOMI_API_KEY?.trim();
+  const envDirect = normalizeSecretInput(process.env.XIAOMI_API_KEY);
   if (envDirect) {
     return envDirect;
   }
@@ -139,65 +142,11 @@ function resolveXiaomiApiKey(): string | undefined {
     return undefined;
   }
   const cred = store.profiles[apiProfile];
-  if (cred?.type === "api_key" && cred.key?.trim()) {
-    return cred.key.trim();
+  if (cred?.type === "api_key" && normalizeSecretInput(cred.key)) {
+    return normalizeSecretInput(cred.key);
   }
-  if (cred?.type === "token" && cred.token?.trim()) {
-    return cred.token.trim();
-  }
-  return undefined;
-}
-
-function resolveDeepseekApiKey(): string | undefined {
-  const envDirect = process.env.DEEPSEEK_API_KEY?.trim();
-  if (envDirect) return envDirect;
-
-  const envResolved = resolveEnvApiKey("deepseek");
-  if (envResolved?.apiKey) return envResolved.apiKey;
-
-  const cfg = loadConfig();
-  const key = getCustomProviderApiKey(cfg, "deepseek");
-  if (key) return key;
-
-  const store = ensureAuthProfileStore();
-  const apiProfile = listProfilesForProvider(store, "deepseek").find((id) => {
-    const cred = store.profiles[id];
-    return cred?.type === "api_key" || cred?.type === "token";
-  });
-  if (!apiProfile) return undefined;
-  const cred = store.profiles[apiProfile];
-  if (cred?.type === "api_key" && cred.key?.trim()) {
-    return cred.key.trim();
-  }
-  if (cred?.type === "token" && cred.token?.trim()) {
-    return cred.token.trim();
-  }
-  return undefined;
-}
-
-function resolveMoonshotApiKey(): string | undefined {
-  const envDirect = process.env.MOONSHOT_API_KEY?.trim();
-  if (envDirect) return envDirect;
-
-  const envResolved = resolveEnvApiKey("moonshot");
-  if (envResolved?.apiKey) return envResolved.apiKey;
-
-  const cfg = loadConfig();
-  const key = getCustomProviderApiKey(cfg, "moonshot");
-  if (key) return key;
-
-  const store = ensureAuthProfileStore();
-  const apiProfile = listProfilesForProvider(store, "moonshot").find((id) => {
-    const cred = store.profiles[id];
-    return cred?.type === "api_key" || cred?.type === "token";
-  });
-  if (!apiProfile) return undefined;
-  const cred = store.profiles[apiProfile];
-  if (cred?.type === "api_key" && cred.key?.trim()) {
-    return cred.key.trim();
-  }
-  if (cred?.type === "token" && cred.token?.trim()) {
-    return cred.token.trim();
+  if (cred?.type === "token" && normalizeSecretInput(cred.token)) {
+    return normalizeSecretInput(cred.token);
   }
   return undefined;
 }
@@ -324,16 +273,6 @@ export async function resolveProviderAuths(params: {
       if (apiKey) {
         auths.push({ provider, token: apiKey });
       }
-      continue;
-    }
-    if (provider === "deepseek") {
-      const apiKey = resolveDeepseekApiKey();
-      if (apiKey) auths.push({ provider, token: apiKey });
-      continue;
-    }
-    if (provider === "moonshot") {
-      const apiKey = resolveMoonshotApiKey();
-      if (apiKey) auths.push({ provider, token: apiKey });
       continue;
     }
 

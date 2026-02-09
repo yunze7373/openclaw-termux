@@ -136,8 +136,7 @@ export class OpenClawApp extends LitElement {
   @state() chatThinkingLevel: string | null = null;
   @state() chatQueue: ChatQueueItem[] = [];
   @state() chatAttachments: ChatAttachment[] = [];
-  @state() modelProviders: Record<string, any> | null = null;
-  @state() selectedModelId: string | null = null;
+  @state() chatManualRefreshInFlight = false;
   // Sidebar state for tool output viewing
   @state() sidebarOpen = false;
   @state() sidebarContent: string | null = null;
@@ -289,7 +288,6 @@ export class OpenClawApp extends LitElement {
   @state() cronForm: CronFormState = { ...DEFAULT_CRON_FORM };
   @state() cronRunsJobId: string | null = null;
   @state() cronRuns: CronRunLogEntry[] = [];
-  @state() cronEditingId: string | null = null;
   @state() cronBusy = false;
 
   @state() skillsLoading = false;
@@ -398,11 +396,12 @@ export class OpenClawApp extends LitElement {
     resetChatScrollInternal(this as unknown as Parameters<typeof resetChatScrollInternal>[0]);
   }
 
-  scrollToBottom() {
+  scrollToBottom(opts?: { smooth?: boolean }) {
     resetChatScrollInternal(this as unknown as Parameters<typeof resetChatScrollInternal>[0]);
     scheduleChatScrollInternal(
       this as unknown as Parameters<typeof scheduleChatScrollInternal>[0],
       true,
+      Boolean(opts?.smooth),
     );
   }
 
@@ -558,10 +557,6 @@ export class OpenClawApp extends LitElement {
       this.sidebarError = null;
       this.sidebarCloseTimer = null;
     }, 200);
-  }
-
-  handleModelChange(modelId: string) {
-    this.selectedModelId = modelId;
   }
 
   handleSplitRatioChange(ratio: number) {

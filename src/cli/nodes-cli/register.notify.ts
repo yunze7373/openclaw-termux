@@ -9,7 +9,7 @@ export function registerNodesNotifyCommand(nodes: Command) {
   nodesCallOpts(
     nodes
       .command("notify")
-      .description("Send a local notification on a node (macOS or Termux/Android)")
+      .description("Send a local notification on a node (mac only)")
       .requiredOption("--node <idOrNameOrIp>", "Node id, name, or IP")
       .option("--title <text>", "Notification title")
       .option("--body <text>", "Notification body")

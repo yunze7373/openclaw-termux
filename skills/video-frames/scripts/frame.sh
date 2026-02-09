@@ -7,9 +7,9 @@ Usage:
   frame.sh <video-file> [--time HH:MM:SS] [--index N] --out /path/to/frame.jpg
 
 Examples:
-  frame.sh video.mp4 --out "${TMPDIR:-$HOME/tmp}/frame.jpg"
-  frame.sh video.mp4 --time 00:00:10 --out "${TMPDIR:-$HOME/tmp}/frame-10s.jpg"
-  frame.sh video.mp4 --index 0 --out "${TMPDIR:-$HOME/tmp}/frame0.png"
+  frame.sh video.mp4 --out /tmp/frame.jpg
+  frame.sh video.mp4 --time 00:00:10 --out /tmp/frame-10s.jpg
+  frame.sh video.mp4 --index 0 --out /tmp/frame0.png
 EOF
   exit 2
 }

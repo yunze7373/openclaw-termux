@@ -73,9 +73,6 @@ function candidateBinDirs(opts: EnsureOpenClawPathOpts): string[] {
     candidates.push(localBinDir);
   }
 
-  // Add the project root itself if it contains the moltbot executable.
-  if (isExecutable(path.join(cwd, "moltbot"))) candidates.push(cwd);
-
   const miseDataDir = process.env.MISE_DATA_DIR ?? path.join(homeDir, ".local", "share", "mise");
   const miseShims = path.join(miseDataDir, "shims");
   if (isDirectory(miseShims)) {
@@ -92,7 +89,6 @@ function candidateBinDirs(opts: EnsureOpenClawPathOpts): string[] {
     candidates.push(process.env.XDG_BIN_HOME);
   }
   candidates.push(path.join(homeDir, ".local", "bin"));
-  candidates.push(path.join(homeDir, "go", "bin"));
   candidates.push(path.join(homeDir, ".local", "share", "pnpm"));
   candidates.push(path.join(homeDir, ".bun", "bin"));
   candidates.push(path.join(homeDir, ".yarn", "bin"));

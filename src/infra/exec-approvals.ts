@@ -238,7 +238,7 @@ export function readExecApprovalsSnapshot(): ExecApprovalsSnapshot {
     parsed = null;
   }
   const file =
-    parsed && typeof parsed === "object"
+    parsed?.version === 1
       ? normalizeExecApprovals(parsed)
       : normalizeExecApprovals({ version: 1, agents: {} });
   return {
@@ -258,6 +258,9 @@ export function loadExecApprovals(): ExecApprovalsFile {
     }
     const raw = fs.readFileSync(filePath, "utf8");
     const parsed = JSON.parse(raw) as ExecApprovalsFile;
+    if (parsed?.version !== 1) {
+      return normalizeExecApprovals({ version: 1, agents: {} });
+    }
     return normalizeExecApprovals(parsed);
   } catch {
     return normalizeExecApprovals({ version: 1, agents: {} });

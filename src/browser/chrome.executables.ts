@@ -508,9 +508,6 @@ export function findChromeExecutableMac(): BrowserExecutable | null {
 
 export function findChromeExecutableLinux(): BrowserExecutable | null {
   const candidates: Array<BrowserExecutable> = [
-    // Termux (Android)
-    { kind: "chromium", path: "/data/data/com.termux/files/usr/bin/chromium-browser" },
-    { kind: "chromium", path: "/data/data/com.termux/files/usr/bin/chromium" },
     { kind: "chrome", path: "/usr/bin/google-chrome" },
     { kind: "chrome", path: "/usr/bin/google-chrome-stable" },
     { kind: "chrome", path: "/usr/bin/chrome" },
@@ -603,7 +600,6 @@ export function resolveBrowserExecutableForPlatform(
   resolved: ResolvedBrowserConfig,
   platform: NodeJS.Platform,
 ): BrowserExecutable | null {
-  const effectivePlatform = platform === "android" ? "linux" : platform;
   if (resolved.executablePath) {
     if (!exists(resolved.executablePath)) {
       throw new Error(`browser.executablePath not found: ${resolved.executablePath}`);
@@ -611,18 +607,18 @@ export function resolveBrowserExecutableForPlatform(
     return { kind: "custom", path: resolved.executablePath };
   }
 
-  const detected = detectDefaultChromiumExecutable(effectivePlatform);
+  const detected = detectDefaultChromiumExecutable(platform);
   if (detected) {
     return detected;
   }
 
-  if (effectivePlatform === "darwin") {
+  if (platform === "darwin") {
     return findChromeExecutableMac();
   }
-  if (effectivePlatform === "linux") {
+  if (platform === "linux") {
     return findChromeExecutableLinux();
   }
-  if (effectivePlatform === "win32") {
+  if (platform === "win32") {
     return findChromeExecutableWindows();
   }
   return null;

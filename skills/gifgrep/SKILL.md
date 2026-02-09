@@ -53,8 +53,7 @@ TUI + previews
 Download + reveal
 
 - `--download` saves to `~/Downloads`
-- `--reveal` shows the last download in your file manager (Finder on macOS)
-- Termux/Android: use `termux-open` to open files or folders (e.g., `termux-open "$HOME/Downloads"`)
+- `--reveal` shows the last download in Finder
 
 Stills + sheets
 
