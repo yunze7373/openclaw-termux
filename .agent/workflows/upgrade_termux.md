@@ -173,6 +173,15 @@ memory/
 /PROJECT-CONTEXT.md
 ```
 
+### 4.4 `README.md` — 从备份恢复 Termux 版 README
+
+`README.md` 是完全不同的内容（Termux 版有功能对比表、Android 硬件能力、安装说明等），必须从备份恢复：
+
+```bash
+cd C:\Users\han\source\repos\yunze7373\openclaw-termux
+git checkout backup/pre-<NEW_VERSION> -- README.md
+```
+
 ---
 
 ## Step 5: 检查并修复 Termux 兼容性问题
@@ -215,7 +224,7 @@ git checkout backup/pre-<NEW_VERSION> -- <缺失文件路径>
 
 ```bash
 cd C:\Users\han\source\repos\yunze7373\openclaw-termux
-git add .npmrc package.json .gitignore src/logging/logger.ts
+git add .npmrc package.json .gitignore README.md src/logging/logger.ts
 ```
 
 ```bash
@@ -225,7 +234,8 @@ git commit -m "chore(termux): restore Termux-specific customizations after <NEW_
 - .npmrc: restore sharp mirror config for Android/Termux
 - package.json: set version to <VERSION>-termux.1, restore Termux description and repository
 - .gitignore: restore Termux private repo ignore rules
-- src/logging/logger.ts: use os.tmpdir() instead of hardcoded /tmp"
+- src/logging/logger.ts: use os.tmpdir() instead of hardcoded /tmp
+- README.md: restore Termux-specific README"
 ```
 
 ---
