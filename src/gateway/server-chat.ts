@@ -282,10 +282,7 @@ export function createAgentEventHandler({
       state: "delta" as const,
       message: {
         role: "assistant",
-        content: [
-          { type: "text", text },
-          ...injectLocalImages(text)
-        ],
+        content: [{ type: "text", text }],
         timestamp: now,
       },
     };

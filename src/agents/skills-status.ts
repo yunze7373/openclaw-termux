@@ -92,7 +92,6 @@ function selectPreferredInstallSpec(
   const cargoSpec = findKind("cargo");
 
   const isTermuxAndroid = process.platform === "android" || Boolean(process.env.TERMUX_VERSION) || (process.env.PREFIX || "").includes("com.termux") || Boolean(process.env.ANDROID_ROOT);
-
   if (isTermuxAndroid) {
     // Termux often lacks brew and treats "android" as "linux" for most CLI tooling.
     // Prefer npm/go/pip/cargo installers when available.
@@ -148,7 +147,7 @@ function resolveSkillOsFilter(): { platform: NodeJS.Platform; compatible: NodeJS
     return { platform: raw, compatible: [raw] };
   }
   // Skills typically declare linux, not android, but Termux should accept both.
-  return { platform: "linux" as NodeJS.Platform, compatible: ["linux" as NodeJS.Platform, "android" as NodeJS.Platform] };
+  return { platform: "linux", compatible: ["linux", "android"] };
 }
 
 function normalizeInstallOptions(
@@ -163,7 +162,7 @@ function normalizeInstallOptions(
   const { compatible } = resolveSkillOsFilter();
   const filtered = install.filter((spec) => {
     const osList = spec.os ?? [];
-    return osList.length === 0 || compatible.some((os) => osList.includes(os as string));
+    return osList.length === 0 || compatible.some((os) => osList.includes(os));
   });
   if (filtered.length === 0) {
     return [];
@@ -263,11 +262,11 @@ function buildSkillStatus(
       : [];
   const missingOs =
     requiredOs.length > 0 &&
-    !osFilter.compatible.some((os) => requiredOs.includes(os as string)) &&
+    !osFilter.compatible.some((os) => requiredOs.includes(os)) &&
     !eligibility?.remote?.platforms?.some((remotePlatform) => {
       const rp = String(remotePlatform);
       if (rp === "android") {
-        return requiredOs.includes("linux" as NodeJS.Platform) || requiredOs.includes("android" as unknown as NodeJS.Platform);
+        return requiredOs.includes("linux" as NodeJS.Platform) || requiredOs.includes("android");
       }
       return requiredOs.includes(rp as NodeJS.Platform);
     })
