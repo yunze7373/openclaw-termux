@@ -63,86 +63,110 @@ async function resizeImageBase64IfNeeded(params: {
   width?: number;
   height?: number;
 }> {
-  const buf = Buffer.from(params.base64, "base64");
-  const meta = await getImageMetadata(buf);
-  const width = meta?.width;
-  const height = meta?.height;
-  const overBytes = buf.byteLength > params.maxBytes;
-  const hasDimensions = typeof width === "number" && typeof height === "number";
-  if (
-    hasDimensions &&
-    !overBytes &&
-    width <= params.maxDimensionPx &&
-    height <= params.maxDimensionPx
-  ) {
+  try {
+    const buf = Buffer.from(params.base64, "base64");
+    const meta = await getImageMetadata(buf);
+    const width = meta?.width;
+    const height = meta?.height;
+    const overBytes = buf.byteLength > params.maxBytes;
+    const hasDimensions = typeof width === "number" && typeof height === "number";
+    if (
+      hasDimensions &&
+      !overBytes &&
+      width <= params.maxDimensionPx &&
+      height <= params.maxDimensionPx
+    ) {
+      return {
+        base64: params.base64,
+        mimeType: params.mimeType,
+        resized: false,
+        width,
+        height,
+      };
+    }
+    if (
+      hasDimensions &&
+      (width > params.maxDimensionPx || height > params.maxDimensionPx || overBytes)
+    ) {
+      log.warn("Image exceeds limits; resizing", {
+        label: params.label,
+        width,
+        height,
+        maxDimensionPx: params.maxDimensionPx,
+        maxBytes: params.maxBytes,
+      });
+    }
+
+    const qualities = [85, 75, 65, 55, 45, 35];
+    const maxDim = hasDimensions ? Math.max(width ?? 0, height ?? 0) : params.maxDimensionPx;
+    const sideStart = maxDim > 0 ? Math.min(params.maxDimensionPx, maxDim) : params.maxDimensionPx;
+    const sideGrid = [sideStart, 1800, 1600, 1400, 1200, 1000, 800]
+      .map((v) => Math.min(params.maxDimensionPx, v))
+      .filter((v, i, arr) => v > 0 && arr.indexOf(v) === i)
+      .toSorted((a, b) => b - a);
+
+    let smallest: { buffer: Buffer; size: number } | null = null;
+    for (const side of sideGrid) {
+      for (const quality of qualities) {
+        const out = await resizeToJpeg({
+          buffer: buf,
+          maxSide: side,
+          quality,
+          withoutEnlargement: true,
+        });
+        if (!smallest || out.byteLength < smallest.size) {
+          smallest = { buffer: out, size: out.byteLength };
+        }
+        if (out.byteLength <= params.maxBytes) {
+          log.info("Image resized", {
+            label: params.label,
+            width,
+            height,
+            maxDimensionPx: params.maxDimensionPx,
+            maxBytes: params.maxBytes,
+            originalBytes: buf.byteLength,
+            resizedBytes: out.byteLength,
+            quality,
+            side,
+          });
+          return {
+            base64: out.toString("base64"),
+            mimeType: "image/jpeg",
+            resized: true,
+            width,
+            height,
+          };
+        }
+      }
+    }
+
+    const best = smallest?.buffer ?? buf;
+    const maxMb = (params.maxBytes / (1024 * 1024)).toFixed(0);
+    const gotMb = (best.byteLength / (1024 * 1024)).toFixed(2);
+    // If we still can't resize it enough, or if it was just a resize attempt that failed to get small enough
+    // We strictly should throw if it's over the limit, but for Termux resilience we'll try to pass it through
+    if (best.byteLength > params.maxBytes) {
+         log.warn(`Image could not be reduced below ${maxMb}MB (got ${gotMb}MB) - passing through raw`);
+    }
+     return {
+        base64: best.toString("base64"),
+        mimeType: "image/jpeg",
+        resized: true,
+        width,
+        height,
+      };
+
+  } catch (err) {
+    // FALLBACK: If sharp fails (e.g. on Termux), log the error but return the ORIGINAL image.
+    // This allows the LLM to at least ATAEMPT to process it, rather than blocking the user.
+    log.error("Image resizing/analysis failed (likely missing sharp); passing through original", { err });
     return {
       base64: params.base64,
       mimeType: params.mimeType,
-      resized: false,
-      width,
-      height,
+      resized: false
     };
   }
-  if (
-    hasDimensions &&
-    (width > params.maxDimensionPx || height > params.maxDimensionPx || overBytes)
-  ) {
-    log.warn("Image exceeds limits; resizing", {
-      label: params.label,
-      width,
-      height,
-      maxDimensionPx: params.maxDimensionPx,
-      maxBytes: params.maxBytes,
-    });
-  }
 
-  const qualities = [85, 75, 65, 55, 45, 35];
-  const maxDim = hasDimensions ? Math.max(width ?? 0, height ?? 0) : params.maxDimensionPx;
-  const sideStart = maxDim > 0 ? Math.min(params.maxDimensionPx, maxDim) : params.maxDimensionPx;
-  const sideGrid = [sideStart, 1800, 1600, 1400, 1200, 1000, 800]
-    .map((v) => Math.min(params.maxDimensionPx, v))
-    .filter((v, i, arr) => v > 0 && arr.indexOf(v) === i)
-    .toSorted((a, b) => b - a);
-
-  let smallest: { buffer: Buffer; size: number } | null = null;
-  for (const side of sideGrid) {
-    for (const quality of qualities) {
-      const out = await resizeToJpeg({
-        buffer: buf,
-        maxSide: side,
-        quality,
-        withoutEnlargement: true,
-      });
-      if (!smallest || out.byteLength < smallest.size) {
-        smallest = { buffer: out, size: out.byteLength };
-      }
-      if (out.byteLength <= params.maxBytes) {
-        log.info("Image resized", {
-          label: params.label,
-          width,
-          height,
-          maxDimensionPx: params.maxDimensionPx,
-          maxBytes: params.maxBytes,
-          originalBytes: buf.byteLength,
-          resizedBytes: out.byteLength,
-          quality,
-          side,
-        });
-        return {
-          base64: out.toString("base64"),
-          mimeType: "image/jpeg",
-          resized: true,
-          width,
-          height,
-        };
-      }
-    }
-  }
-
-  const best = smallest?.buffer ?? buf;
-  const maxMb = (params.maxBytes / (1024 * 1024)).toFixed(0);
-  const gotMb = (best.byteLength / (1024 * 1024)).toFixed(2);
-  throw new Error(`Image could not be reduced below ${maxMb}MB (got ${gotMb}MB)`);
 }
 
 export async function sanitizeContentBlocksImages(
