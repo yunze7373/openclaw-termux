@@ -492,7 +492,7 @@ build_project() {
         fi
         
         if $TSDOWN_CMD > "$BUILD_LOG" 2>&1 && \
-           pnpm build:plugin-sdk:dts >> "$BUILD_LOG" 2>&1 && \
+           pnpm exec tsc -p tsconfig.plugin-sdk.dts.json >> "$BUILD_LOG" 2>&1 && \
            node --import tsx scripts/write-plugin-sdk-entry-dts.ts >> "$BUILD_LOG" 2>&1 && \
            node --import tsx scripts/canvas-a2ui-copy.ts >> "$BUILD_LOG" 2>&1 && \
            node --import tsx scripts/copy-hook-metadata.ts >> "$BUILD_LOG" 2>&1 && \
