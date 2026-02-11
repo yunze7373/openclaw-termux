@@ -88,12 +88,46 @@ function selectPreferredInstallSpec(
   const nodeSpec = findKind("node");
   const goSpec = findKind("go");
   const uvSpec = findKind("uv");
+  const pipSpec = findKind("pip");
+  const cargoSpec = findKind("cargo");
+
+  const isTermuxAndroid = process.platform === "android" || Boolean(process.env.TERMUX_VERSION) || (process.env.PREFIX || "").includes("com.termux") || Boolean(process.env.ANDROID_ROOT);
+
+  if (isTermuxAndroid) {
+    // Termux often lacks brew and treats "android" as "linux" for most CLI tooling.
+    // Prefer npm/go/pip/cargo installers when available.
+    if (cargoSpec) {
+      return cargoSpec;
+    }
+    if (nodeSpec) {
+      return nodeSpec;
+    }
+    if (pipSpec) {
+      return pipSpec;
+    }
+    if (goSpec) {
+      return goSpec;
+    }
+    if (uvSpec) {
+      return uvSpec;
+    }
+    if (brewSpec) {
+      return brewSpec;
+    }
+    return indexed[0];
+  }
 
   if (prefs.preferBrew && hasBinary("brew") && brewSpec) {
     return brewSpec;
   }
+  if (cargoSpec) {
+    return cargoSpec;
+  }
   if (uvSpec) {
     return uvSpec;
+  }
+  if (pipSpec) {
+    return pipSpec;
   }
   if (nodeSpec) {
     return nodeSpec;
@@ -107,6 +141,16 @@ function selectPreferredInstallSpec(
   return indexed[0];
 }
 
+function resolveSkillOsFilter(): { platform: NodeJS.Platform; compatible: NodeJS.Platform[] } {
+  const raw = process.platform;
+  const isTermuxAndroid = raw === "android" || Boolean(process.env.TERMUX_VERSION);
+  if (!isTermuxAndroid) {
+    return { platform: raw, compatible: [raw] };
+  }
+  // Skills typically declare linux, not android, but Termux should accept both.
+  return { platform: "linux" as NodeJS.Platform, compatible: ["linux" as NodeJS.Platform, "android" as NodeJS.Platform] };
+}
+
 function normalizeInstallOptions(
   entry: SkillEntry,
   prefs: SkillsInstallPreferences,
@@ -116,10 +160,10 @@ function normalizeInstallOptions(
     return [];
   }
 
-  const platform = process.platform;
+  const { compatible } = resolveSkillOsFilter();
   const filtered = install.filter((spec) => {
     const osList = spec.os ?? [];
-    return osList.length === 0 || osList.includes(platform);
+    return osList.length === 0 || compatible.some((os) => osList.includes(os as string));
   });
   if (filtered.length === 0) {
     return [];
@@ -141,6 +185,10 @@ function normalizeInstallOptions(
         label = `Install ${spec.module} (go)`;
       } else if (spec.kind === "uv" && spec.package) {
         label = `Install ${spec.package} (uv)`;
+      } else if (spec.kind === "pip" && spec.package) {
+        label = `Install ${spec.package} (pip)`;
+      } else if (spec.kind === "cargo" && spec.package) {
+        label = `Install ${spec.package} (cargo)`;
       } else if (spec.kind === "download" && spec.url) {
         const url = spec.url.trim();
         const last = url.split("/").pop();
@@ -171,6 +219,7 @@ function buildSkillStatus(
   eligibility?: SkillEligibilityContext,
   bundledNames?: Set<string>,
 ): SkillStatusEntry {
+  const osFilter = resolveSkillOsFilter();
   const skillKey = resolveSkillKey(entry);
   const skillConfig = resolveSkillConfig(config, skillKey);
   const disabled = skillConfig?.enabled === false;
@@ -214,8 +263,14 @@ function buildSkillStatus(
       : [];
   const missingOs =
     requiredOs.length > 0 &&
-    !requiredOs.includes(process.platform) &&
-    !eligibility?.remote?.platforms?.some((platform) => requiredOs.includes(platform))
+    !osFilter.compatible.some((os) => requiredOs.includes(os as string)) &&
+    !eligibility?.remote?.platforms?.some((remotePlatform) => {
+      const rp = String(remotePlatform);
+      if (rp === "android") {
+        return requiredOs.includes("linux" as NodeJS.Platform) || requiredOs.includes("android" as unknown as NodeJS.Platform);
+      }
+      return requiredOs.includes(rp as NodeJS.Platform);
+    })
       ? requiredOs
       : [];
 

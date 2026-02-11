@@ -19,6 +19,70 @@ import {
 } from "./skills.js";
 import { resolveSkillKey } from "./skills/frontmatter.js";
 
+// Termux/Android compatibility
+const isTermux = Boolean(process.env.TERMUX_VERSION || process.platform === "android");
+
+// Common brew formula -> Termux pkg mapping
+const BREW_TO_PKG_MAP: Record<string, string | null> = {
+  jq: "jq",
+  curl: "curl",
+  wget: "wget",
+  git: "git",
+  ffmpeg: "ffmpeg",
+  imagemagick: "imagemagick",
+  "gh": "gh",
+  "fzf": "fzf",
+  "ripgrep": "ripgrep",
+  "bat": "bat",
+  "fd": "fd",
+  "exa": "eza",
+  "htop": "htop",
+  "tree": "tree",
+  "tmux": "tmux",
+  "neovim": "neovim",
+  "python": "python",
+  "rust": "rust",
+  "golang": "golang",
+  "go": "golang",
+  "node": "nodejs-lts",
+  "nodejs": "nodejs-lts",
+  // Specific mappings for Termux
+  "openai-whisper": null, // Use pip
+  "gemini-cli": null,     // Use pip
+  "1password-cli": null,  // No avail
+  "ripgrep+jq": "ripgrep jq", // Composite for session-logs
+};
+
+const MACOS_ONLY_SKILLS = new Set([
+  "apple-notes",
+  "apple-reminders",
+  "imsg",
+  "things-mac",
+  "peekaboo",
+  "sag",
+  "goplaces",
+  "gog",
+  "summarize",
+  "1password",
+  "openhue",
+  "model-usage",
+]);
+
+// Check if brew formula is macOS-only (has tap prefix like "user/tap")
+function isMacOSOnlyFormula(formula: string): boolean {
+  // Formulas with "/" are brew taps, not available on Termux
+  return formula.includes("/");
+}
+
+// Resolve PNPM_HOME for Termux
+function resolveTermuxPnpmHome(): string {
+  if (process.env.PNPM_HOME) return process.env.PNPM_HOME;
+
+  // Default termux home is /data/data/com.termux/files/home
+  const home = process.env.HOME || "/data/data/com.termux/files/home";
+  return path.join(home, ".local/share/pnpm");
+}
+
 export type SkillInstallRequest = {
   workspaceDir: string;
   skillName: string;
@@ -169,6 +233,17 @@ function buildInstallCommand(
       if (!spec.formula) {
         return { argv: null, error: "missing brew formula" };
       }
+      if (isTermux) {
+        // Skip macOS-only brew taps (formulas with "/")
+        if (isMacOSOnlyFormula(spec.formula)) {
+          return { argv: null, error: `macOS-only (brew tap): ${spec.formula}` };
+        }
+        // Map common brew formulas to pkg names
+        const pkgName = BREW_TO_PKG_MAP[spec.formula.toLowerCase()] ?? spec.formula;
+        // Termux supports installing multiple packages at once if separated by space
+        const pkgs = pkgName.split(" ");
+        return { argv: ["pkg", "install", "-y", ...pkgs] };
+      }
       return { argv: ["brew", "install", spec.formula] };
     }
     case "node": {
@@ -185,11 +260,39 @@ function buildInstallCommand(
       }
       return { argv: ["go", "install", spec.module] };
     }
+    case "pip": {
+      if (!spec.package) {
+        return { argv: null, error: "missing pip package" };
+      }
+      const pipExe = hasBinary("pip") ? "pip" : (hasBinary("pip3") ? "pip3" : null);
+      // On Termux, pip is usually available if python is installed.
+      // If not, we might want to suggest installing python.
+      if (!pipExe) {
+         if (isTermux) {
+            // Suggest python
+            return { argv: null, error: "pip not found (install python via pkg)" };
+         }
+         return { argv: null, error: "pip not found" };
+      }
+      return { argv: [pipExe, "install", spec.package] };
+    }
     case "uv": {
       if (!spec.package) {
         return { argv: null, error: "missing uv package" };
       }
       return { argv: ["uv", "tool", "install", spec.package] };
+    }
+    case "cargo": {
+      if (!spec.package) {
+        return { argv: null, error: "missing cargo package" };
+      }
+      if (!hasBinary("cargo")) {
+        if (isTermux) {
+           return { argv: null, error: "cargo not found. Run: pkg install rust" };
+        }
+        return { argv: null, error: "cargo not found" };
+      }
+      return { argv: ["cargo", "install", spec.package] };
     }
     case "download": {
       return { argv: null, error: "download install handled separately" };
@@ -443,7 +546,7 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
   }
 
   const brewExe = hasBinary("brew") ? "brew" : resolveBrewExecutable();
-  if (spec.kind === "brew" && !brewExe) {
+  if (spec.kind === "brew" && !brewExe && !isTermux) {
     return withWarnings(
       {
         ok: false,
@@ -456,7 +559,23 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
     );
   }
   if (spec.kind === "uv" && !hasBinary("uv")) {
-    if (brewExe) {
+    if (isTermux) {
+      const pkgResult = await runCommandWithTimeout(["pkg", "install", "-y", "uv"], {
+        timeoutMs,
+      });
+      if (pkgResult.code !== 0) {
+        return withWarnings(
+          {
+            ok: false,
+            message: "Failed to install uv (pkg)",
+            stdout: pkgResult.stdout.trim(),
+            stderr: pkgResult.stderr.trim(),
+            code: pkgResult.code,
+          },
+          warnings,
+        );
+      }
+    } else if (brewExe) {
       const brewResult = await runCommandWithTimeout([brewExe, "install", "uv"], {
         timeoutMs,
       });
@@ -503,7 +622,23 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
   }
 
   if (spec.kind === "go" && !hasBinary("go")) {
-    if (brewExe) {
+    if (isTermux) {
+      const pkgResult = await runCommandWithTimeout(["pkg", "install", "-y", "golang"], {
+        timeoutMs,
+      });
+      if (pkgResult.code !== 0) {
+        return withWarnings(
+          {
+            ok: false,
+            message: "Failed to install go (pkg)",
+            stdout: pkgResult.stdout.trim(),
+            stderr: pkgResult.stderr.trim(),
+            code: pkgResult.code,
+          },
+          warnings,
+        );
+      }
+    } else if (brewExe) {
       const brewResult = await runCommandWithTimeout([brewExe, "install", "go"], {
         timeoutMs,
       });
@@ -534,11 +669,38 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
   }
 
   let env: NodeJS.ProcessEnv | undefined;
+
+  // Set PNPM_HOME for Termux node global installs
+  if (isTermux && spec.kind === "node") {
+    const pnpmHome = resolveTermuxPnpmHome();
+    env = {
+      PNPM_HOME: pnpmHome,
+      PATH: `${pnpmHome}:${process.env.PATH}`,
+    };
+  }
+
   if (spec.kind === "go" && brewExe) {
     const brewBin = await resolveBrewBinDir(timeoutMs, brewExe);
     if (brewBin) {
-      env = { GOBIN: brewBin };
+      env = { ...env, GOBIN: brewBin };
     }
+  }
+
+  // Set GOPATH/GOBIN for Termux go installs
+  if (isTermux && spec.kind === "go") {
+    const goPath = path.join(process.env.HOME || "/data/data/com.termux/files/home", "go");
+    const goBin = path.join(goPath, "bin");
+    env = {
+      ...env,
+      GOPATH: goPath,
+      GOBIN: goBin,
+      PATH: `${goBin}:${process.env.PATH}`,
+    };
+  }
+
+  // Set UV_LINK_MODE for Termux uv installs to avoid hardlink errors
+  if (isTermux && spec.kind === "uv") {
+    env = { ...env, UV_LINK_MODE: "copy" };
   }
 
   const result = await (async () => {

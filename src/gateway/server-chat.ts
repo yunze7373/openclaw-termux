@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { normalizeVerboseLevel } from "../auto-reply/thinking.js";
 import { loadConfig } from "../config/config.js";
 import { type AgentEventPayload, getAgentRunContext } from "../infra/agent-events.js";
@@ -201,6 +203,44 @@ export type ChatEventBroadcast = (
 
 export type NodeSendToSession = (sessionKey: string, event: string, payload: unknown) => void;
 
+function injectLocalImages(text: string): any[] {
+  if (!text) return [];
+  const mdRegex = /!\[.*?\]\((.*?)\)/g;
+  const paths = new Set<string>();
+  let match;
+  while ((match = mdRegex.exec(text)) !== null) {
+    if (match[1]) paths.add(match[1]);
+  }
+  const pathRegex = /(?:^|\s)([\w\/-]+\.(?:png|jpg|jpeg|gif|webp))(?:$|\s)/gi;
+  while ((match = pathRegex.exec(text)) !== null) {
+    if (match[1]) paths.add(match[1]);
+  }
+
+  const blocks: any[] = [];
+  for (const p of paths) {
+    try {
+      const fullPath = path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
+      if (!fullPath.startsWith("/data/data/com.termux/files/home")) continue;
+
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+        const ext = path.extname(fullPath).toLowerCase();
+        const mime = ext === ".png" ? "image/png" :
+                     (ext === ".jpg" || ext === ".jpeg") ? "image/jpeg" :
+                     ext === ".gif" ? "image/gif" :
+                     ext === ".webp" ? "image/webp" : undefined;
+        if (!mime) continue;
+
+        const data = fs.readFileSync(fullPath).toString("base64");
+        blocks.push({
+          type: "image",
+          source: { type: "base64", media_type: mime, data }
+        });
+      }
+    } catch { /* ignore */ }
+  }
+  return blocks;
+}
+
 export type AgentEventHandlerOptions = {
   broadcast: ChatEventBroadcast;
   broadcastToConnIds: (
@@ -242,7 +282,10 @@ export function createAgentEventHandler({
       state: "delta" as const,
       message: {
         role: "assistant",
-        content: [{ type: "text", text }],
+        content: [
+          { type: "text", text },
+          ...injectLocalImages(text)
+        ],
         timestamp: now,
       },
     };
@@ -272,7 +315,10 @@ export function createAgentEventHandler({
         message: text
           ? {
               role: "assistant",
-              content: [{ type: "text", text }],
+              content: [
+                { type: "text", text },
+                ...injectLocalImages(text)
+              ],
               timestamp: Date.now(),
             }
           : undefined,
