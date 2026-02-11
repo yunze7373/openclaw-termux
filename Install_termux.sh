@@ -339,6 +339,57 @@ EOF
 }
 
 # ============================================================================
+# Termux Compatibility Patches
+# ============================================================================
+
+patch_termux_compat() {
+    # Only run on Termux platform
+    [[ "$PLATFORM" != "termux" ]] && return 0
+
+    local PATCHED=0
+
+    # Patch 1: tsdown.config.ts - exclude canvas native bindings from bundling
+    if [[ -f "$PROJECT_ROOT/tsdown.config.ts" ]]; then
+        if ! grep -q '@napi-rs/canvas' "$PROJECT_ROOT/tsdown.config.ts" 2>/dev/null; then
+            # Insert external array after env definition
+            sed -i '/^const env = {/,/^};/ {
+                /^};/a\
+\
+// Exclude native bindings that cannot be bundled on Android\/Termux\
+const external = ["@napi-rs/canvas", "@napi-rs/canvas-android-arm64"];
+            }' "$PROJECT_ROOT/tsdown.config.ts"
+
+            # Add external to each config entry
+            sed -i '/^    env,$/a\    external,' "$PROJECT_ROOT/tsdown.config.ts"
+
+            PATCHED=$((PATCHED + 1))
+        fi
+    fi
+
+    # Patch 2: src/media/input-files.ts - skip canvas loading on Termux
+    if [[ -f "$PROJECT_ROOT/src/media/input-files.ts" ]]; then
+        if ! grep -q 'TERMUX_VERSION' "$PROJECT_ROOT/src/media/input-files.ts" 2>/dev/null; then
+            sed -i '/async function loadCanvasModule/,/^}/ {
+                /async function loadCanvasModule/a\
+  // Skip canvas loading on Termux (Android) due to native binding incompatibility\
+  if (process.env.TERMUX_VERSION || process.platform === "android") {\
+    throw new Error("Canvas module not available on Android\/Termux");\
+  }\
+
+            }' "$PROJECT_ROOT/src/media/input-files.ts"
+
+            PATCHED=$((PATCHED + 1))
+        fi
+    fi
+
+    if [[ $PATCHED -gt 0 ]]; then
+        print_success "Applied $PATCHED Termux compatibility patches"
+    else
+        print_success "Termux compatibility patches already in place"
+    fi
+}
+
+# ============================================================================
 # Project Build
 # ============================================================================
 
@@ -367,7 +418,6 @@ build_project() {
         if [[ $pnpm_exit -eq 0 ]]; then
             # Run compatible postinstall scripts
             node node_modules/.pnpm/esbuild*/node_modules/esbuild/install.js 2>/dev/null || true
-            node node_modules/.pnpm/tsdown*/node_modules/tsdown/postinstall.js 2>/dev/null || true
             stop_spinner "true" "npm dependencies installed"
             rm -f "$BUILD_LOG"
         else
@@ -414,7 +464,34 @@ build_project() {
     # TypeScript compilation with spinner
     start_spinner "Compiling TypeScript (this may take 1-2 minutes)..."
     if [[ "$PLATFORM" == "termux" ]]; then
-        if pnpm exec tsdown > "$BUILD_LOG" 2>&1 && \
+        # Resolve tsdown command: pnpm exec → global → direct node execution
+        local TSDOWN_CMD=""
+        if pnpm exec tsdown --version > /dev/null 2>&1; then
+            TSDOWN_CMD="pnpm exec tsdown"
+        elif command -v tsdown &> /dev/null; then
+            TSDOWN_CMD="tsdown"
+        else
+            # Auto-install global tsdown
+            npm install -g tsdown > /dev/null 2>&1 || true
+            if command -v tsdown &> /dev/null; then
+                TSDOWN_CMD="tsdown"
+            else
+                # Last resort: direct node execution
+                local TSDOWN_ENTRY=$(find node_modules/.pnpm -path '*/tsdown/dist/run.mjs' 2>/dev/null | head -1)
+                if [[ -n "$TSDOWN_ENTRY" ]]; then
+                    TSDOWN_CMD="node $TSDOWN_ENTRY"
+                fi
+            fi
+        fi
+        
+        if [[ -z "$TSDOWN_CMD" ]]; then
+            stop_spinner "false" "tsdown command not found"
+            echo ""
+            echo -e "${YELLOW}Tip: Install tsdown manually: npm install -g tsdown${NC}"
+            exit 1
+        fi
+        
+        if $TSDOWN_CMD > "$BUILD_LOG" 2>&1 && \
            pnpm build:plugin-sdk:dts >> "$BUILD_LOG" 2>&1 && \
            node --import tsx scripts/write-plugin-sdk-entry-dts.ts >> "$BUILD_LOG" 2>&1 && \
            node --import tsx scripts/canvas-a2ui-copy.ts >> "$BUILD_LOG" 2>&1 && \
@@ -733,6 +810,7 @@ main() {
             setup_environment
             
             print_step "Building Project"
+            patch_termux_compat
             build_project
             
             # Fix sqlite-vec (Termux only)
@@ -768,6 +846,7 @@ main() {
             print_success "Code updated"
             
             print_step "Building Project"
+            patch_termux_compat
             build_project
             
             # Fix sqlite-vec (Termux only)
@@ -811,6 +890,7 @@ main() {
             print_success "Detected: $PLATFORM"
             
             print_step "Building Project"
+            patch_termux_compat
             build_project
             create_cli_entries
             

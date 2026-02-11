@@ -322,6 +322,57 @@ EOF
 }
 
 # ============================================================================
+# Termux 兼容性补丁
+# ============================================================================
+
+patch_termux_compat() {
+    # 仅在 Termux 平台执行
+    [[ "$PLATFORM" != "termux" ]] && return 0
+
+    local PATCHED=0
+
+    # 补丁 1: tsdown.config.ts - 排除 canvas 原生绑定
+    if [[ -f "$PROJECT_ROOT/tsdown.config.ts" ]]; then
+        if ! grep -q '@napi-rs/canvas' "$PROJECT_ROOT/tsdown.config.ts" 2>/dev/null; then
+            # 在 env 定义后插入 external 数组
+            sed -i '/^const env = {/,/^};/ {
+                /^};/a\
+\
+// Exclude native bindings that cannot be bundled on Android\/Termux\
+const external = ["@napi-rs/canvas", "@napi-rs/canvas-android-arm64"];
+            }' "$PROJECT_ROOT/tsdown.config.ts"
+
+            # 在每个配置条目中添加 external
+            sed -i '/^    env,$/a\    external,' "$PROJECT_ROOT/tsdown.config.ts"
+
+            PATCHED=$((PATCHED + 1))
+        fi
+    fi
+
+    # 补丁 2: src/media/input-files.ts - 跳过 Termux 上的 canvas 加载
+    if [[ -f "$PROJECT_ROOT/src/media/input-files.ts" ]]; then
+        if ! grep -q 'TERMUX_VERSION' "$PROJECT_ROOT/src/media/input-files.ts" 2>/dev/null; then
+            sed -i '/async function loadCanvasModule/,/^}/ {
+                /async function loadCanvasModule/a\
+  // Skip canvas loading on Termux (Android) due to native binding incompatibility\
+  if (process.env.TERMUX_VERSION || process.platform === "android") {\
+    throw new Error("Canvas module not available on Android\/Termux");\
+  }\
+
+            }' "$PROJECT_ROOT/src/media/input-files.ts"
+
+            PATCHED=$((PATCHED + 1))
+        fi
+    fi
+
+    if [[ $PATCHED -gt 0 ]]; then
+        print_success "已应用 $PATCHED 个 Termux 兼容性补丁"
+    else
+        print_success "Termux 兼容性补丁已就位"
+    fi
+}
+
+# ============================================================================
 # 项目构建
 # ============================================================================
 
@@ -349,7 +400,6 @@ build_project() {
         if [[ $pnpm_exit -eq 0 ]]; then
             # 手动运行兼容的 postinstall 脚本
             node node_modules/.pnpm/esbuild*/node_modules/esbuild/install.js 2>/dev/null || true
-            node node_modules/.pnpm/tsdown*/node_modules/tsdown/postinstall.js 2>/dev/null || true
             stop_spinner "true" "npm 依赖安装完成"
             rm -f "$BUILD_LOG"
         else
@@ -394,7 +444,34 @@ build_project() {
     # TypeScript 编译（带旋转动画）
     start_spinner "编译 TypeScript (这可能需要 1-2 分钟)..."
     if [[ "$PLATFORM" == "termux" ]]; then
-        if pnpm exec tsdown > "$BUILD_LOG" 2>&1 && \
+        # 解析 tsdown 命令: pnpm exec → 全局 → 直接 node 执行
+        local TSDOWN_CMD=""
+        if pnpm exec tsdown --version > /dev/null 2>&1; then
+            TSDOWN_CMD="pnpm exec tsdown"
+        elif command -v tsdown &> /dev/null; then
+            TSDOWN_CMD="tsdown"
+        else
+            # 自动安装全局 tsdown
+            npm install -g tsdown > /dev/null 2>&1 || true
+            if command -v tsdown &> /dev/null; then
+                TSDOWN_CMD="tsdown"
+            else
+                # 最后回退: 直接用 node 执行
+                local TSDOWN_ENTRY=$(find node_modules/.pnpm -path '*/tsdown/dist/run.mjs' 2>/dev/null | head -1)
+                if [[ -n "$TSDOWN_ENTRY" ]]; then
+                    TSDOWN_CMD="node $TSDOWN_ENTRY"
+                fi
+            fi
+        fi
+        
+        if [[ -z "$TSDOWN_CMD" ]]; then
+            stop_spinner "false" "找不到 tsdown 命令"
+            echo ""
+            echo -e "${YELLOW}提示: 请手动安装 tsdown: npm install -g tsdown${NC}"
+            exit 1
+        fi
+        
+        if $TSDOWN_CMD > "$BUILD_LOG" 2>&1 && \
            pnpm build:plugin-sdk:dts >> "$BUILD_LOG" 2>&1 && \
            node --import tsx scripts/write-plugin-sdk-entry-dts.ts >> "$BUILD_LOG" 2>&1 && \
            node --import tsx scripts/canvas-a2ui-copy.ts >> "$BUILD_LOG" 2>&1 && \
@@ -690,6 +767,7 @@ main() {
             setup_environment
             
             print_step "构建项目"
+            patch_termux_compat
             build_project
             
             # 修复 sqlite-vec (Termux 需要)
@@ -725,6 +803,7 @@ main() {
             print_success "代码已更新"
             
             print_step "构建项目"
+            patch_termux_compat
             build_project
             
             # 修复 sqlite-vec (Termux 需要)
@@ -768,6 +847,7 @@ main() {
             print_success "检测到: $PLATFORM"
             
             print_step "构建项目"
+            patch_termux_compat
             build_project
             create_cli_entries
             

@@ -9,6 +9,11 @@ let pdfJsModulePromise: Promise<PdfJsModule> | null = null;
 
 // Lazy-load optional PDF/image deps so non-PDF paths don't require native installs.
 async function loadCanvasModule(): Promise<CanvasModule> {
+  // Skip canvas loading on Termux (Android) due to native binding incompatibility
+  if (process.env.TERMUX_VERSION || process.platform === "android") {
+    throw new Error("Canvas module not available on Android/Termux");
+  }
+
   if (!canvasModulePromise) {
     canvasModulePromise = import("@napi-rs/canvas").catch((err) => {
       canvasModulePromise = null;
