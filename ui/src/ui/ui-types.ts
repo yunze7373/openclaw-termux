@@ -33,4 +33,5 @@ export type CronFormState = {
   deliveryChannel: string;
   deliveryTo: string;
   timeoutSeconds: string;
+  postToMainPrefix: string;
 };

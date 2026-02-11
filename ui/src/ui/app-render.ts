@@ -9,7 +9,7 @@ import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-iden
 import { loadAgentSkills } from "./controllers/agent-skills.ts";
 import { loadAgents } from "./controllers/agents.ts";
 import { loadChannels } from "./controllers/channels.ts";
-import { loadChatHistory } from "./controllers/chat.ts";
+import { loadChatHistory, loadChatModels } from "./controllers/chat.ts";
 import {
   applyConfig,
   loadConfig,
@@ -24,6 +24,9 @@ import {
   runCronJob,
   removeCronJob,
   addCronJob,
+  editCronJob,
+  cancelEditCronJob,
+  updateCronJob,
 } from "./controllers/cron.ts";
 import { loadDebug, callDebugMethod } from "./controllers/debug.ts";
 import {
@@ -602,6 +605,10 @@ export function renderApp(state: AppViewState) {
                 onRun: (job) => runCronJob(state, job),
                 onRemove: (job) => removeCronJob(state, job),
                 onLoadRuns: (jobId) => loadCronRuns(state, jobId),
+                editingId: state.cronEditingId,
+                onEdit: (job) => editCronJob(state, job),
+                onCancelEdit: () => cancelEditCronJob(state),
+                onUpdate: () => updateCronJob(state),
               })
             : nothing
         }
@@ -1074,6 +1081,7 @@ export function renderApp(state: AppViewState) {
                   void state.loadAssistantIdentity();
                   void loadChatHistory(state);
                   void refreshChatAvatar(state);
+                  void loadChatModels(state);
                 },
                 thinkingLevel: state.chatThinkingLevel,
                 showThinking,
@@ -1095,7 +1103,7 @@ export function renderApp(state: AppViewState) {
                 focusMode: chatFocus,
                 onRefresh: () => {
                   state.resetToolStream();
-                  return Promise.all([loadChatHistory(state), refreshChatAvatar(state)]);
+                  return Promise.all([loadChatHistory(state), refreshChatAvatar(state), loadChatModels(state)]);
                 },
                 onToggleFocusMode: () => {
                   if (state.onboarding) {
@@ -1117,6 +1125,20 @@ export function renderApp(state: AppViewState) {
                 onNewSession: () => state.handleSendChat("/new", { restoreDraft: true }),
                 showNewMessages: state.chatNewMessagesBelow && !state.chatManualRefreshInFlight,
                 onScrollToBottom: () => state.scrollToBottom(),
+                selectedModelId: state.selectedModelId,
+                onModelChange: (id) => (state.selectedModelId = id),
+                modelProviders: (() => {
+                  const providers: Record<string, { name: string; models: unknown[] }> = {};
+                  for (const m of state.chatModels) {
+                    // @ts-expect-error weak type
+                    const p = (m.provider as string) ?? "unknown";
+                    if (!providers[p]) {
+                      providers[p] = { name: p, models: [] };
+                    }
+                    providers[p].models.push(m);
+                  }
+                  return providers;
+                })(),
                 // Sidebar props for tool output viewing
                 sidebarOpen: state.sidebarOpen,
                 sidebarContent: state.sidebarContent,

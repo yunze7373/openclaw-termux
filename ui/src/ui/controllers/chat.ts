@@ -17,6 +17,8 @@ export type ChatState = {
   chatStream: string | null;
   chatStreamStartedAt: number | null;
   lastError: string | null;
+  selectedModelId: string | null;
+  chatModels: unknown[];
 };
 
 export type ChatEventPayload = {
@@ -49,6 +51,18 @@ export async function loadChatHistory(state: ChatState) {
     state.chatLoading = false;
   }
 }
+    
+export async function loadChatModels(state: ChatState) {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  try {
+    const res = (await state.client.request("models.list", {})) as { models?: unknown[] };
+    state.chatModels = Array.isArray(res.models) ? res.models : [];
+  } catch (err) {
+    console.error("Failed to load models:", err);
+  }
+}
 
 function dataUrlToBase64(dataUrl: string): { content: string; mimeType: string } | null {
   const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
@@ -62,6 +76,7 @@ export async function sendChatMessage(
   state: ChatState,
   message: string,
   attachments?: ChatAttachment[],
+  modelId?: string | null,
 ): Promise<string | null> {
   if (!state.client || !state.connected) {
     return null;
@@ -129,6 +144,7 @@ export async function sendChatMessage(
       deliver: false,
       idempotencyKey: runId,
       attachments: apiAttachments,
+      modelId,
     });
     return runId;
   } catch (err) {

@@ -78,6 +78,7 @@ import {
 } from "./app-tool-stream.ts";
 import { resolveInjectedAssistantIdentity } from "./assistant-identity.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
+import { loadChatModels } from "./controllers/chat.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
 
@@ -137,6 +138,8 @@ export class OpenClawApp extends LitElement {
   @state() chatQueue: ChatQueueItem[] = [];
   @state() chatAttachments: ChatAttachment[] = [];
   @state() chatManualRefreshInFlight = false;
+  @state() selectedModelId: string | null = null;
+  @state() chatModels: unknown[] = [];
   // Sidebar state for tool output viewing
   @state() sidebarOpen = false;
   @state() sidebarContent: string | null = null;
@@ -288,6 +291,7 @@ export class OpenClawApp extends LitElement {
   @state() cronForm: CronFormState = { ...DEFAULT_CRON_FORM };
   @state() cronRunsJobId: string | null = null;
   @state() cronRuns: CronRunLogEntry[] = [];
+  @state() cronEditingId: string | null = null;
   @state() cronBusy = false;
 
   @state() skillsLoading = false;
@@ -355,6 +359,7 @@ export class OpenClawApp extends LitElement {
 
   protected firstUpdated() {
     handleFirstUpdated(this as unknown as Parameters<typeof handleFirstUpdated>[0]);
+    void loadChatModels(this);
   }
 
   disconnectedCallback() {

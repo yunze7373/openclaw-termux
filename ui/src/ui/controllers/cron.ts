@@ -13,6 +13,7 @@ export type CronState = {
   cronForm: CronFormState;
   cronRunsJobId: string | null;
   cronRuns: CronRunLogEntry[];
+  cronEditingId: string | null;
   cronBusy: boolean;
 };
 
@@ -95,6 +96,127 @@ export function buildCronPayload(form: CronFormState) {
     payload.timeoutSeconds = timeoutSeconds;
   }
   return payload;
+}
+
+export function editCronJob(state: CronState, job: CronJob) {
+  state.cronEditingId = job.id;
+  const form: CronFormState = {
+    name: job.name,
+    description: job.description || "",
+    agentId: job.agentId || "",
+    enabled: job.enabled,
+    scheduleKind: "cron",
+    scheduleAt: "",
+    everyAmount: "",
+    everyUnit: "hours",
+    cronExpr: "",
+    cronTz: "",
+    sessionTarget: job.sessionTarget,
+    wakeMode: job.wakeMode,
+    payloadKind: job.payload.kind === "systemEvent" ? "systemEvent" : "agentTurn",
+    payloadText: "",
+    deliveryMode: "none",
+    deliveryChannel: "",
+    deliveryTo: "",
+    timeoutSeconds: "",
+    postToMainPrefix: job.isolation?.postToMainPrefix || "",
+  };
+
+  // Schedule
+  if (job.schedule.kind === "at") {
+    form.scheduleKind = "at";
+    // @ts-expect-error atMs vs at string difference in types
+    form.scheduleAt = new Date(job.schedule.atMs || job.schedule.at).toISOString().slice(0, 16);
+  } else if (job.schedule.kind === "every") {
+    form.scheduleKind = "every";
+    // heuristics to guess unit
+    const ms = job.schedule.everyMs;
+    if (ms % 86_400_000 === 0) {
+      form.everyAmount = String(ms / 86_400_000);
+      form.everyUnit = "days";
+    } else if (ms % 3_600_000 === 0) {
+      form.everyAmount = String(ms / 3_600_000);
+      form.everyUnit = "hours";
+    } else {
+      form.everyAmount = String(Math.floor(ms / 60_000));
+      form.everyUnit = "minutes";
+    }
+  } else if (job.schedule.kind === "cron") {
+    form.scheduleKind = "cron";
+    form.cronExpr = job.schedule.expr;
+    form.cronTz = job.schedule.tz || "";
+  }
+
+  // Payload
+  if (job.payload.kind === "systemEvent") {
+    form.payloadText = job.payload.text;
+  } else if (job.payload.kind === "agentTurn") {
+    form.payloadText = job.payload.message;
+    // Map delivery back to form fields
+    if (job.delivery) {
+      form.deliveryMode = job.delivery.mode;
+      form.deliveryChannel = job.delivery.channel ?? "";
+      form.deliveryTo = job.delivery.to ?? "";
+    } else {
+      form.deliveryMode = "none";
+      form.deliveryChannel = "";
+      form.deliveryTo = "";
+    }
+    form.timeoutSeconds = job.payload.timeoutSeconds ? String(job.payload.timeoutSeconds) : "";
+  }
+
+  state.cronForm = form;
+}
+
+export function cancelEditCronJob(state: CronState) {
+  state.cronEditingId = null;
+  state.cronForm = {
+    ...state.cronForm,
+    name: "",
+    description: "",
+    payloadText: "",
+  };
+}
+
+export async function updateCronJob(state: CronState) {
+  if (!state.client || !state.connected || state.cronBusy || !state.cronEditingId) {
+    return;
+  }
+  state.cronBusy = true;
+  state.cronError = null;
+  try {
+    const schedule = buildCronSchedule(state.cronForm);
+    const payload = buildCronPayload(state.cronForm);
+    const agentId = state.cronForm.agentId.trim();
+    const patch = {
+      name: state.cronForm.name.trim(),
+      description: state.cronForm.description.trim() || undefined,
+      agentId: agentId || undefined,
+      enabled: state.cronForm.enabled,
+      schedule,
+      sessionTarget: state.cronForm.sessionTarget,
+      wakeMode: state.cronForm.wakeMode,
+      payload,
+      isolation:
+        state.cronForm.postToMainPrefix.trim() &&
+        state.cronForm.sessionTarget === "isolated"
+          ? { postToMainPrefix: state.cronForm.postToMainPrefix.trim() }
+          : undefined,
+    };
+    if (!patch.name) {
+      throw new Error("Name required.");
+    }
+
+    await state.client.request("cron.update", { id: state.cronEditingId, patch });
+
+    cancelEditCronJob(state); // Reset form and mode
+    await loadCronJobs(state);
+    await loadCronStatus(state);
+  } catch (err) {
+    state.cronError = String(err);
+  } finally {
+    state.cronBusy = false;
+  }
 }
 
 export async function addCronJob(state: CronState) {

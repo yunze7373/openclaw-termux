@@ -688,6 +688,7 @@ export type CronJob = {
   wakeMode: CronWakeMode;
   payload: CronPayload;
   delivery?: CronDelivery;
+  isolation?: { postToMainPrefix?: string };
   state?: CronJobState;
 };
 

@@ -13,6 +13,10 @@ export type CronProps = {
   error: string | null;
   busy: boolean;
   form: CronFormState;
+  editingId: string | null;
+  onEdit: (job: CronJob) => void;
+  onCancelEdit: () => void;
+  onUpdate: () => void;
   channels: string[];
   channelLabels?: Record<string, string>;
   channelMeta?: ChannelUiMetaEntry[];
@@ -90,7 +94,7 @@ export function renderCron(props: CronProps) {
       </div>
 
       <div class="card">
-        <div class="card-title">New Job</div>
+        <div class="card-title">${props.editingId ? "Edit Job" : "New Job"}</div>
         <div class="card-sub">Create a scheduled wakeup or agent run.</div>
         <div class="form-grid" style="margin-top: 16px;">
           <label class="field">
@@ -265,9 +269,26 @@ export function renderCron(props: CronProps) {
             : nothing
         }
         <div class="row" style="margin-top: 14px;">
-          <button class="btn primary" ?disabled=${props.busy} @click=${props.onAdd}>
-            ${props.busy ? "Saving…" : "Add job"}
+          <button
+            class="btn primary"
+            ?disabled=${props.busy}
+            @click=${props.editingId ? props.onUpdate : props.onAdd}
+          >
+            ${props.busy ? "Saving…" : props.editingId ? "Save changes" : "Add job"}
           </button>
+          ${
+            props.editingId
+              ? html`
+                  <button
+                    class="btn"
+                    ?disabled=${props.busy}
+                    @click=${props.onCancelEdit}
+                  >
+                    Cancel
+                  </button>
+                `
+              : nothing
+          }
         </div>
       </div>
     </section>
@@ -402,6 +423,16 @@ function renderJob(job: CronJob, props: CronProps) {
           <span class="chip">${job.wakeMode}</span>
         </div>
         <div class="row cron-job-actions">
+          <button
+            class="btn"
+            ?disabled=${props.busy}
+            @click=${(event: Event) => {
+              event.stopPropagation();
+              props.onEdit(job);
+            }}
+          >
+            Edit
+          </button>
           <button
             class="btn"
             ?disabled=${props.busy}

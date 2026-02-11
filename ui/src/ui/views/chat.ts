@@ -68,6 +68,9 @@ export type ChatProps = {
   onCloseSidebar?: () => void;
   onSplitRatioChange?: (ratio: number) => void;
   onChatScroll?: (event: Event) => void;
+  modelProviders: Record<string, any> | null;
+  selectedModelId: string | null;
+  onModelChange: (modelId: string) => void;
 };
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
@@ -404,6 +407,7 @@ export function renderChat(props: ChatProps) {
             ></textarea>
           </label>
           <div class="chat-compose__actions">
+            ${renderModelSelector(props)}
             <button
               class="btn"
               ?disabled=${!props.connected || (!canAbort && props.sending)}
@@ -559,4 +563,114 @@ function messageKey(message: unknown, index: number): string {
     return `msg:${role}:${timestamp}:${index}`;
   }
   return `msg:${role}:${index}`;
+}
+
+function renderModelSelector(props: ChatProps) {
+  if (!props.modelProviders) {
+    return nothing;
+  }
+
+  const providers = Object.entries(props.modelProviders);
+  const copilotEntry = providers.find(([id]) => id === "github-copilot");
+  const otherProviders = providers.filter(([id]) => id !== "github-copilot");
+
+  // Sort other providers alphabetically
+  otherProviders.sort((a, b) => a[0].localeCompare(b[0]));
+
+  const renderCopilotGroups = () => {
+    if (!copilotEntry) {
+      return nothing;
+    }
+    const [providerId, providerData] = copilotEntry;
+    const provider = providerData as { models: any[]; name?: string };
+
+    const groups: Record<string, any[]> = {
+      "0x": [],
+      "0.33x": [],
+      "1x": [],
+      "3x": [],
+    };
+    const otherModels: any[] = [];
+
+    provider.models.forEach((model: any) => {
+      if (model.name.includes("(0x)")) {
+        groups["0x"].push(model);
+      } else if (model.name.includes("(0.33x)")) {
+        groups["0.33x"].push(model);
+      } else if (model.name.includes("(1x)")) {
+        groups["1x"].push(model);
+      } else if (model.name.includes("(3x)")) {
+        groups["3x"].push(model);
+      } else {
+        otherModels.push(model);
+      }
+    });
+
+    // Merge uncategorized models into 1x (Standard) as a fallback
+    groups["1x"].push(...otherModels);
+
+    const groupConfig = [
+      { key: "0x", label: "🎁 GitHub Copilot (Free)", emoji: "🎁" },
+      { key: "0.33x", label: "💎 GitHub Copilot (Economy)", emoji: "💎" },
+      { key: "1x", label: "⚡ GitHub Copilot (Standard)", emoji: "⚡" },
+      { key: "3x", label: "🔥 GitHub Copilot (Pro)", emoji: "🔥" },
+    ];
+
+    return groupConfig.map((config) => {
+      const models = groups[config.key];
+      if (!models || models.length === 0) {
+        return nothing;
+      }
+
+      // Sort models alphabetically
+      models.sort((a, b) => a.name.localeCompare(b.name));
+
+      return html`
+        <optgroup label="${config.label}">
+          ${models.map((model: any) => {
+            const cleanName = model.name
+              .replace(/^GitHub Copilot: /, "")
+              .replace(/ \(\d+(\.\d+)?x\)$/, "")
+              .replace(/ \(Preview\)/, " (Preview)");
+
+            const label = `${config.emoji} ${cleanName}`;
+            const modelId = `${providerId}/${model.id}`;
+            return html`<option
+              value=${modelId}
+              ?selected=${modelId === props.selectedModelId}
+            >
+              ${label}
+            </option>`;
+          })}
+        </optgroup>
+      `;
+    });
+  };
+
+  return html`
+    <select
+      class="model-selector"
+      @change=${(e: Event) => props.onModelChange((e.target as HTMLSelectElement).value)}
+    >
+      <option value="">Default Model</option>
+      ${renderCopilotGroups()}
+      ${otherProviders.map(([providerId, providerData]) => {
+        const provider = providerData as { models: any[]; name?: string };
+        return html`
+          <optgroup label="${provider.name || providerId}">
+            ${provider.models.map((model: any) => {
+              const name = (model.name || model.id).replace(/^GitHub Copilot: /, "");
+              const modelId = `${providerId}/${model.id}`;
+              return html`<option
+                value=${modelId}
+                ?selected=${modelId === props.selectedModelId}
+              >
+                ${name}
+              </option>`;
+            })}
+          </optgroup>
+        `;
+      })}
+    </select>
+  `;
 }

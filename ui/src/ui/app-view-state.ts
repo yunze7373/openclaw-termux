@@ -58,6 +58,8 @@ export type AppViewState = {
   chatMessages: unknown[];
   chatToolMessages: unknown[];
   chatStream: string | null;
+  selectedModelId: string | null;
+  chatModels: unknown[];
   chatStreamStartedAt: number | null;
   chatRunId: string | null;
   compactionStatus: CompactionStatus | null;
@@ -189,6 +191,7 @@ export type AppViewState = {
   cronForm: CronFormState;
   cronRunsJobId: string | null;
   cronRuns: CronRunLogEntry[];
+  cronEditingId: string | null;
   cronBusy: boolean;
   skillsLoading: boolean;
   skillsReport: SkillStatusReport | null;
