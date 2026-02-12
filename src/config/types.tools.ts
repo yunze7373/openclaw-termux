@@ -270,6 +270,10 @@ export type MemorySearchConfig = {
     vector?: {
       /** Enable sqlite-vec extension for vector search (default: true). */
       enabled?: boolean;
+      /** Vector store provider (default: builtin). */
+      provider?: string;
+      /** Provider-specific local settings. */
+      local?: Record<string, unknown>;
       /** Optional override path to sqlite-vec extension (.dylib/.so/.dll). */
       extensionPath?: string;
     };

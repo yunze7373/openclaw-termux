@@ -375,7 +375,7 @@ export const MemorySearchSchema = z
             local: z.record(z.string(), z.any()).optional(),
             extensionPath: z.string().optional(),
           })
-          .strict()
+          .passthrough()
           .optional(),
       })
       .strict()

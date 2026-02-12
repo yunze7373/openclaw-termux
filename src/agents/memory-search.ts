@@ -36,6 +36,8 @@ export type ResolvedMemorySearchConfig = {
     path: string;
     vector: {
       enabled: boolean;
+      provider?: string;
+      local?: Record<string, any>;
       extensionPath?: string;
     };
   };
@@ -181,10 +183,16 @@ function mergeConfig(
     .map((value) => value.trim())
     .filter(Boolean);
   const extraPaths = Array.from(new Set(rawPaths));
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const vectorDefaults = defaults?.store?.vector || {};
+  const vectorOverrides = overrides?.store?.vector || {};
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
   const vector = {
-    enabled: overrides?.store?.vector?.enabled ?? defaults?.store?.vector?.enabled ?? true,
-    extensionPath:
-      overrides?.store?.vector?.extensionPath ?? defaults?.store?.vector?.extensionPath,
+    enabled: vectorOverrides.enabled ?? vectorDefaults.enabled ?? true,
+    provider: vectorOverrides.provider ?? vectorDefaults.provider,
+    local: vectorOverrides.local ?? vectorDefaults.local,
+    extensionPath: vectorOverrides.extensionPath ?? vectorDefaults.extensionPath,
   };
   const store = {
     driver: overrides?.store?.driver ?? defaults?.store?.driver ?? "sqlite",
