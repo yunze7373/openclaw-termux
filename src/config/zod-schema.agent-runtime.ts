@@ -371,6 +371,8 @@ export const MemorySearchSchema = z
         vector: z
           .object({
             enabled: z.boolean().optional(),
+            provider: z.string().optional(),
+            local: z.record(z.string(), z.any()).optional(),
             extensionPath: z.string().optional(),
           })
           .strict()
