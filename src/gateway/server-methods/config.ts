@@ -193,6 +193,7 @@ export const configHandlers: GatewayRequestHandlers = {
 
     const validated = validateConfigObjectWithPlugins(restored);
     if (!validated.ok) {
+      console.error("[config.set] validation failed:", JSON.stringify(validated.issues, null, 2));
       respond(
         false,
         undefined,
@@ -392,6 +393,7 @@ export const configHandlers: GatewayRequestHandlers = {
 
     const validated = validateConfigObjectWithPlugins(restoredApply);
     if (!validated.ok) {
+      console.error("[config.apply] validation failed:", JSON.stringify(validated.issues, null, 2));
       respond(
         false,
         undefined,

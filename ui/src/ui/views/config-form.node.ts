@@ -535,7 +535,7 @@ function renderObject(params: {
 
   // Nested objects get collapsible treatment
   return html`
-    <details class="cfg-object" open>
+    <details class="cfg-object">
       <summary class="cfg-object__header">
         <span class="cfg-object__title">${label}</span>
         <span class="cfg-object__chevron">${icons.chevronDown}</span>
