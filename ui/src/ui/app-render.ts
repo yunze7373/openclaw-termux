@@ -728,11 +728,8 @@ export function renderApp(state: AppViewState) {
                   if (!configValue) {
                     return;
                   }
-                  const list = (configValue as { agents?: { list?: unknown[] } }).agents?.list;
-                  if (!Array.isArray(list)) {
-                    return;
-                  }
-                  const index = list.findIndex(
+                  const list = (configValue as { agents?: { list?: unknown[] } }).agents?.list ?? [];
+                  let index = list.findIndex(
                     (entry) =>
                       entry &&
                       typeof entry === "object" &&
@@ -740,7 +737,11 @@ export function renderApp(state: AppViewState) {
                       (entry as { id?: string }).id === agentId,
                   );
                   if (index < 0) {
-                    return;
+                    if (!profile && !clearAllow) {
+                      return;
+                    }
+                    index = list.length;
+                    updateConfigFormValue(state, ["agents", "list", index, "id"], agentId);
                   }
                   const basePath = ["agents", "list", index, "tools"];
                   if (profile) {
@@ -756,11 +757,8 @@ export function renderApp(state: AppViewState) {
                   if (!configValue) {
                     return;
                   }
-                  const list = (configValue as { agents?: { list?: unknown[] } }).agents?.list;
-                  if (!Array.isArray(list)) {
-                    return;
-                  }
-                  const index = list.findIndex(
+                  const list = (configValue as { agents?: { list?: unknown[] } }).agents?.list ?? [];
+                  let index = list.findIndex(
                     (entry) =>
                       entry &&
                       typeof entry === "object" &&
@@ -768,7 +766,11 @@ export function renderApp(state: AppViewState) {
                       (entry as { id?: string }).id === agentId,
                   );
                   if (index < 0) {
-                    return;
+                    if (alsoAllow.length === 0 && deny.length === 0) {
+                      return;
+                    }
+                    index = list.length;
+                    updateConfigFormValue(state, ["agents", "list", index, "id"], agentId);
                   }
                   const basePath = ["agents", "list", index, "tools"];
                   if (alsoAllow.length > 0) {
@@ -796,11 +798,8 @@ export function renderApp(state: AppViewState) {
                   if (!configValue) {
                     return;
                   }
-                  const list = (configValue as { agents?: { list?: unknown[] } }).agents?.list;
-                  if (!Array.isArray(list)) {
-                    return;
-                  }
-                  const index = list.findIndex(
+                  const list = (configValue as { agents?: { list?: unknown[] } }).agents?.list ?? [];
+                  let index = list.findIndex(
                     (entry) =>
                       entry &&
                       typeof entry === "object" &&
@@ -808,9 +807,15 @@ export function renderApp(state: AppViewState) {
                       (entry as { id?: string }).id === agentId,
                   );
                   if (index < 0) {
-                    return;
+                    // Enabling a skill on a non-existent agent entry requires creating it.
+                    // Disabling a skill that isn't enabled anyway (because no entry) is a no-op, unless we want to force "explicitly disabled".
+                    // For now, if enabling, we create. If disabling, we check if we need to track it (but usually we only track enabled skills in config unless using a deny list, which this UI doesn't seem to do for skills).
+                    // Actually, the logic below calculates `next` set based on `allSkills`.
+                    // If we want to change the set of enabled skills, we MUST create the agent entry.
+                    index = list.length;
+                    updateConfigFormValue(state, ["agents", "list", index, "id"], agentId);
                   }
-                  const entry = list[index] as { skills?: unknown };
+                  const entry = list[index] as { skills?: unknown } | undefined;
                   const normalizedSkill = skillName.trim();
                   if (!normalizedSkill) {
                     return;
@@ -818,9 +823,10 @@ export function renderApp(state: AppViewState) {
                   const allSkills =
                     state.agentSkillsReport?.skills?.map((skill) => skill.name).filter(Boolean) ??
                     [];
-                  const existing = Array.isArray(entry.skills)
-                    ? entry.skills.map((name) => String(name).trim()).filter(Boolean)
-                    : undefined;
+                  const existing =
+                    entry && Array.isArray(entry.skills)
+                      ? entry.skills.map((name) => String(name).trim()).filter(Boolean)
+                      : undefined;
                   const base = existing ?? allSkills;
                   const next = new Set(base);
                   if (enabled) {
@@ -834,11 +840,8 @@ export function renderApp(state: AppViewState) {
                   if (!configValue) {
                     return;
                   }
-                  const list = (configValue as { agents?: { list?: unknown[] } }).agents?.list;
-                  if (!Array.isArray(list)) {
-                    return;
-                  }
-                  const index = list.findIndex(
+                  const list = (configValue as { agents?: { list?: unknown[] } }).agents?.list ?? [];
+                  let index = list.findIndex(
                     (entry) =>
                       entry &&
                       typeof entry === "object" &&
@@ -846,6 +849,13 @@ export function renderApp(state: AppViewState) {
                       (entry as { id?: string }).id === agentId,
                   );
                   if (index < 0) {
+                    // Clearing skills means ensuring explicitly empty list or removing the key.
+                    // If agent doesn't exist, skills are effectively default (all enabled?).
+                    // If we want to clear them, we might need to explicitly set empty array.
+                    // But `removeConfigFormValue` removes the `skills` key, reverting to default.
+                    // If default is "all enabled", then removing key = all enabled.
+                    // This function seems to intend "reset to default" or "remove overrides".
+                    // If agent doesn't exist, there are no overrides to remove.
                     return;
                   }
                   removeConfigFormValue(state, ["agents", "list", index, "skills"]);
@@ -854,11 +864,8 @@ export function renderApp(state: AppViewState) {
                   if (!configValue) {
                     return;
                   }
-                  const list = (configValue as { agents?: { list?: unknown[] } }).agents?.list;
-                  if (!Array.isArray(list)) {
-                    return;
-                  }
-                  const index = list.findIndex(
+                  const list = (configValue as { agents?: { list?: unknown[] } }).agents?.list ?? [];
+                  let index = list.findIndex(
                     (entry) =>
                       entry &&
                       typeof entry === "object" &&
@@ -866,7 +873,8 @@ export function renderApp(state: AppViewState) {
                       (entry as { id?: string }).id === agentId,
                   );
                   if (index < 0) {
-                    return;
+                    index = list.length;
+                    updateConfigFormValue(state, ["agents", "list", index, "id"], agentId);
                   }
                   updateConfigFormValue(state, ["agents", "list", index, "skills"], []);
                 },
