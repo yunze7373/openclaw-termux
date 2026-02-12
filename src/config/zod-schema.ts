@@ -369,13 +369,19 @@ export const OpenClawSchema = z
         port: z.number().int().positive().optional(),
         mode: z.union([z.literal("local"), z.literal("remote")]).optional(),
         bind: z
-          .union([
-            z.literal("auto"),
-            z.literal("lan"),
-            z.literal("loopback"),
-            z.literal("custom"),
-            z.literal("tailnet"),
-          ])
+          .preprocess(
+            (val) => {
+              if (val === "0.0.0.0" || val === "any") return "lan";
+              return val;
+            },
+            z.union([
+              z.literal("auto"),
+              z.literal("lan"),
+              z.literal("loopback"),
+              z.literal("custom"),
+              z.literal("tailnet"),
+            ]),
+          )
           .optional(),
         controlUi: z
           .object({
