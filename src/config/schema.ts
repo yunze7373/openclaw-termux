@@ -238,6 +238,8 @@ const FIELD_LABELS: Record<string, string> = {
   "agents.defaults.memorySearch.local.modelPath": "Local Embedding Model Path",
   "agents.defaults.memorySearch.store.path": "Memory Search Index Path",
   "agents.defaults.memorySearch.store.vector.enabled": "Memory Search Vector Index",
+  "agents.defaults.memorySearch.store.vector.provider": "Vector Store Provider",
+  "agents.defaults.memorySearch.store.vector.local": "Local Vector Store Settings",
   "agents.defaults.memorySearch.store.vector.extensionPath": "Memory Search Vector Extension Path",
   "agents.defaults.memorySearch.chunking.tokens": "Memory Chunk Tokens",
   "agents.defaults.memorySearch.chunking.overlap": "Memory Chunk Overlap Tokens",
@@ -571,6 +573,10 @@ const FIELD_HELP: Record<string, string> = {
     "SQLite index path (default: ~/.openclaw/memory/{agentId}.sqlite).",
   "agents.defaults.memorySearch.store.vector.enabled":
     "Enable sqlite-vec extension for vector search (default: true).",
+  "agents.defaults.memorySearch.store.vector.provider":
+    'Provider for vector storage (e.g., "local", "pgvector"). Default is "local" (sqlite-vec).',
+  "agents.defaults.memorySearch.store.vector.local":
+    "Configuration options for the local vector store provider (e.g., model paths, dimension settings).",
   "agents.defaults.memorySearch.store.vector.extensionPath":
     "Optional override path to sqlite-vec extension library (.dylib/.so/.dll).",
   "agents.defaults.memorySearch.query.hybrid.enabled":
@@ -773,6 +779,7 @@ const FIELD_PLACEHOLDERS: Record<string, string> = {
   "gateway.controlUi.allowedOrigins": "https://control.example.com",
   "channels.mattermost.baseUrl": "https://chat.example.com",
   "agents.list[].identity.avatar": "avatars/openclaw.png",
+  "agents.defaults.memorySearch.store.vector.provider": "local",
 };
 
 const SENSITIVE_PATTERNS = [/token/i, /password/i, /secret/i, /api.?key/i];
