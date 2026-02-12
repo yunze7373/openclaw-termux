@@ -416,6 +416,24 @@
   border: 1px solid var(--border);
 }
 
+.model-selector {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: var(--input-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  min-width: 160px;
+  max-width: 300px;
+}
+
+:root[data-theme="light"] .model-selector {
+  background: #ffffff;
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
 /* Light theme thinking indicator override */
 :root[data-theme="light"] .chat-controls__thinking {
   background: rgba(255, 255, 255, 0.9);
