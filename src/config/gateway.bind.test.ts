@@ -29,6 +29,19 @@ describe("Gateway Bind Compatibility", () => {
     }
   });
 
+  it('should handle whitespace: "0.0.0.0 " -> "lan"', () => {
+    const config = {
+      gateway: {
+        bind: "0.0.0.0 ",
+      },
+    };
+    const result = OpenClawSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.gateway?.bind).toBe("lan");
+    }
+  });
+
   it('should preserve "lan"', () => {
     const config = {
       gateway: {

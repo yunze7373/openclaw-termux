@@ -371,7 +371,13 @@ export const OpenClawSchema = z
         bind: z
           .preprocess(
             (val) => {
-              if (val === "0.0.0.0" || val === "any") return "lan";
+              // BACKWARD COMPATIBILITY:
+              // Map legacy values "0.0.0.0" (IP) and "any" to the new "lan" mode.
+              // Also trim whitespace to catch accidental "0.0.0.0 " from config files.
+              if (typeof val === "string") {
+                const normalized = val.trim();
+                if (normalized === "0.0.0.0" || normalized === "any") return "lan";
+              }
               return val;
             },
             z.union([
