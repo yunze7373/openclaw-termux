@@ -1,5 +1,6 @@
 import type { EmbeddingProvider, EmbeddingProviderOptions } from "./embeddings.js";
 import { requireApiKey, resolveApiKeyForProvider } from "../agents/model-auth.js";
+import { normalizeSecretInput } from "../utils/normalize-secret-input.js";
 
 export type OpenAiEmbeddingClient = {
   baseUrl: string;
@@ -68,9 +69,33 @@ export async function resolveOpenAiEmbeddingClient(
   const remoteApiKey = remote?.apiKey?.trim();
   const remoteBaseUrl = remote?.baseUrl?.trim();
 
-  const apiKey = remoteApiKey
-    ? remoteApiKey
-    : requireApiKey(
+  const providerConfig = options.config.models?.providers?.openai;
+  const baseUrl = remoteBaseUrl || providerConfig?.baseUrl?.trim() || DEFAULT_OPENAI_BASE_URL;
+
+  let apiKey = remoteApiKey;
+  if (!apiKey) {
+    try {
+      const auth = await resolveApiKeyForProvider({
+        provider: "openai",
+        cfg: options.config,
+        agentDir: options.agentDir,
+      });
+      apiKey = normalizeSecretInput(auth.apiKey);
+    } catch (err) {
+      // If we are using a custom base URL (e.g. local ollama), strict auth is not required.
+      // We fall back to a placeholder to satisfy the Bearer header structure.
+      if (baseUrl === DEFAULT_OPENAI_BASE_URL) {
+        throw err;
+      }
+    }
+  }
+
+  if (!apiKey) {
+    if (baseUrl !== DEFAULT_OPENAI_BASE_URL) {
+      apiKey = "sk-placeholder";
+    } else {
+      // Re-throw the standard error by calling the strict resolver again
+      requireApiKey(
         await resolveApiKeyForProvider({
           provider: "openai",
           cfg: options.config,
@@ -78,9 +103,9 @@ export async function resolveOpenAiEmbeddingClient(
         }),
         "openai",
       );
+    }
+  }
 
-  const providerConfig = options.config.models?.providers?.openai;
-  const baseUrl = remoteBaseUrl || providerConfig?.baseUrl?.trim() || DEFAULT_OPENAI_BASE_URL;
   const headerOverrides = Object.assign({}, providerConfig?.headers, remote?.headers);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
