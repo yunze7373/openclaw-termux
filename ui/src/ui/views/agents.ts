@@ -882,17 +882,13 @@ function renderAgentOverview(params: {
               @change=${(e: Event) =>
                 onModelChange(agent.id, (e.target as HTMLSelectElement).value || null)}
             >
-              ${
-                isDefault
-                  ? nothing
-                  : html`
-                      <option value="">
-                        ${
-                          defaultPrimary ? `Inherit default (${defaultPrimary})` : "Inherit default"
-                        }
-                      </option>
-                    `
-              }
+              <option value="">
+                ${
+                  isDefault
+                    ? "System default"
+                    : (defaultPrimary ? `Inherit default (${defaultPrimary})` : "Inherit default")
+                }
+              </option>
               ${buildModelOptions(configForm, effectivePrimary ?? undefined)}
             </select>
           </label>
