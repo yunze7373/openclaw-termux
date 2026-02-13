@@ -116,4 +116,56 @@ describe("Gateway Bind Compatibility", () => {
       expect(result.data.gateway?.mode).toBe("remote");
     }
   });
+
+  it('should handle legacy/misplaced values in mode: "lan" -> "local"', () => {
+    const config = {
+      gateway: {
+        mode: "lan",
+      },
+    };
+    const result = OpenClawSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.gateway?.mode).toBe("local");
+    }
+  });
+
+  it('should handle legacy/misplaced values in mode: "any" -> "local"', () => {
+    const config = {
+      gateway: {
+        mode: "any",
+      },
+    };
+    const result = OpenClawSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.gateway?.mode).toBe("local");
+    }
+  });
+
+  it('should handle legacy/misplaced values in mode: "0.0.0.0" -> "local"', () => {
+    const config = {
+      gateway: {
+        mode: "0.0.0.0",
+      },
+    };
+    const result = OpenClawSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.gateway?.mode).toBe("local");
+    }
+  });
+
+  it('should handle empty string in mode: "" -> undefined (default)', () => {
+    const config = {
+      gateway: {
+        mode: "",
+      },
+    };
+    const result = OpenClawSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.gateway?.mode).toBeUndefined();
+    }
+  });
 });

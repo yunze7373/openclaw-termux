@@ -368,7 +368,22 @@ export const OpenClawSchema = z
       .object({
         port: z.number().int().positive().optional(),
         mode: z
-          .preprocess((val) => (typeof val === "string" ? val.trim() : val), z.union([z.literal("local"), z.literal("remote")]))
+          .preprocess(
+            (val) => {
+              if (typeof val === "string") {
+                const normalized = val.trim();
+                if (normalized === "") {
+                  return undefined;
+                }
+                if (normalized === "lan" || normalized === "0.0.0.0" || normalized === "any") {
+                  return "local";
+                }
+                return normalized;
+              }
+              return val;
+            },
+            z.union([z.literal("local"), z.literal("remote")]),
+          )
           .optional(),
         bind: z
           .preprocess(
