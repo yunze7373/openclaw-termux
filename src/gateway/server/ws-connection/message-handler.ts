@@ -883,6 +883,7 @@ export function attachGatewayWsMessageHandler(params: {
           connId,
           presenceKey,
           clientIp: reportedClientIp,
+          eventSeq: 0,
         };
         setClient(nextClient);
         setHandshakeState("connected");

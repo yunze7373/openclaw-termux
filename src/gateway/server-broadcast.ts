@@ -32,7 +32,7 @@ function hasEventScope(client: GatewayWsClient, event: string): boolean {
 }
 
 export function createGatewayBroadcaster(params: { clients: Set<GatewayWsClient> }) {
-  let seq = 0;
+  let broadcastSeq = 0;
 
   const broadcastInternal = (
     event: string,
@@ -44,17 +44,13 @@ export function createGatewayBroadcaster(params: { clients: Set<GatewayWsClient>
     targetConnIds?: ReadonlySet<string>,
   ) => {
     const isTargeted = Boolean(targetConnIds);
-    const eventSeq = isTargeted ? undefined : ++seq;
-    const frame = JSON.stringify({
-      type: "event",
-      event,
-      payload,
-      seq: eventSeq,
-      stateVersion: opts?.stateVersion,
-    });
+    if (!isTargeted) {
+      broadcastSeq++;
+    }
+
     const logMeta: Record<string, unknown> = {
       event,
-      seq: eventSeq ?? "targeted",
+      broadcastSeq: isTargeted ? "targeted" : broadcastSeq,
       clients: params.clients.size,
       targets: targetConnIds ? targetConnIds.size : undefined,
       dropIfSlow: opts?.dropIfSlow,
@@ -65,6 +61,7 @@ export function createGatewayBroadcaster(params: { clients: Set<GatewayWsClient>
       Object.assign(logMeta, summarizeAgentEventForWsLog(payload));
     }
     logWs("out", "event", logMeta);
+
     for (const c of params.clients) {
       if (targetConnIds && !targetConnIds.has(c.connId)) {
         continue;
@@ -84,8 +81,20 @@ export function createGatewayBroadcaster(params: { clients: Set<GatewayWsClient>
         }
         continue;
       }
+
+      // Increment sequence for this client only if it's a broadcast
+      const seq = isTargeted ? undefined : ++c.eventSeq;
+
       try {
-        c.socket.send(frame);
+        c.socket.send(
+          JSON.stringify({
+            type: "event",
+            event,
+            payload,
+            seq,
+            stateVersion: opts?.stateVersion,
+          }),
+        );
       } catch {
         /* ignore */
       }
