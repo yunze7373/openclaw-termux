@@ -119,21 +119,21 @@ function handlePaste(e: ClipboardEvent, props: ChatProps) {
     return;
   }
 
-  const imageItems: DataTransferItem[] = [];
+  const fileItems: DataTransferItem[] = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    if (item.type.startsWith("image/")) {
-      imageItems.push(item);
+    if (item.kind === "file") {
+      fileItems.push(item);
     }
   }
 
-  if (imageItems.length === 0) {
+  if (fileItems.length === 0) {
     return;
   }
 
   e.preventDefault();
 
-  for (const item of imageItems) {
+  for (const item of fileItems) {
     const file = item.getAsFile();
     if (!file) {
       continue;
@@ -145,13 +145,43 @@ function handlePaste(e: ClipboardEvent, props: ChatProps) {
       const newAttachment: ChatAttachment = {
         id: generateAttachmentId(),
         dataUrl,
-        mimeType: file.type,
+        mimeType: file.type || "application/octet-stream",
+        name: file.name || "Pasted file",
+        size: file.size,
       };
       const current = props.attachments ?? [];
       props.onAttachmentsChange?.([...current, newAttachment]);
     });
     reader.readAsDataURL(file);
   }
+}
+
+function handleFileSelect(e: Event, props: ChatProps) {
+  const input = e.target as HTMLInputElement;
+  const files = input.files;
+  if (!files || !props.onAttachmentsChange) {
+    return;
+  }
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      const dataUrl = reader.result as string;
+      const newAttachment: ChatAttachment = {
+        id: generateAttachmentId(),
+        dataUrl,
+        mimeType: file.type || "application/octet-stream",
+        name: file.name,
+        size: file.size,
+      };
+      const current = props.attachments ?? [];
+      props.onAttachmentsChange?.([...current, newAttachment]);
+    });
+    reader.readAsDataURL(file);
+  }
+  // Clear the input so the same file can be selected again
+  input.value = "";
 }
 
 function renderAttachmentPreview(props: ChatProps) {
@@ -162,14 +192,20 @@ function renderAttachmentPreview(props: ChatProps) {
 
   return html`
     <div class="chat-attachments">
-      ${attachments.map(
-        (att) => html`
-          <div class="chat-attachment">
-            <img
-              src=${att.dataUrl}
-              alt="Attachment preview"
-              class="chat-attachment__img"
-            />
+      ${attachments.map((att) => {
+        const isImage = att.mimeType.startsWith("image/");
+        return html`
+          <div class="chat-attachment ${isImage ? "" : "chat-attachment--file"}" title="${att.name}">
+            ${isImage
+              ? html`
+                  <img src=${att.dataUrl} alt="Attachment preview" class="chat-attachment__img" />
+                `
+              : html`
+                  <div class="chat-attachment__file-icon">
+                    ${icons.fileText}
+                    <span class="chat-attachment__file-name">${att.name}</span>
+                  </div>
+                `}
             <button
               class="chat-attachment__remove"
               type="button"
@@ -182,8 +218,8 @@ function renderAttachmentPreview(props: ChatProps) {
               ${icons.x}
             </button>
           </div>
-        `,
-      )}
+        `;
+      })}
     </div>
   `;
 }
@@ -408,6 +444,26 @@ export function renderChat(props: ChatProps) {
           </label>
           <div class="chat-compose__actions">
             ${renderModelSelector(props)}
+            <input
+              id="chat-file-input"
+              type="file"
+              multiple
+              style="display: none"
+              @change=${(e: Event) => handleFileSelect(e, props)}
+            />
+            <button
+              class="btn"
+              type="button"
+              ?disabled=${!props.connected}
+              @click=${() => {
+                const input = document.getElementById("chat-file-input") as HTMLInputElement;
+                input?.click();
+              }}
+              aria-label="Upload files"
+              title="Upload files"
+            >
+              ${icons.paperclip}
+            </button>
             <button
               class="btn"
               ?disabled=${!props.connected || (!canAbort && props.sending)}

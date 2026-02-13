@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { MsgContext, TemplateContext } from "../templating.js";
@@ -157,6 +159,31 @@ export async function runPreparedReply(
     abortedLastRun,
   } = params;
   let currentSystemSent = systemSent;
+
+  // Stage generic files to workspace
+  if (opts?.files && opts.files.length > 0) {
+    try {
+      const destDir = path.join(workspaceDir, "media", "inbound");
+      await fs.mkdir(destDir, { recursive: true });
+      const nextPaths = [...(ctx.MediaPaths ?? [])];
+      const nextTypes = [...(ctx.MediaTypes ?? [])];
+
+      for (const file of opts.files) {
+        const filePath = path.join(destDir, file.name);
+        await fs.writeFile(filePath, Buffer.from(file.data, "base64"));
+        const relativePath = path.posix.join("media", "inbound", file.name);
+        nextPaths.push(relativePath);
+        nextTypes.push(file.mimeType);
+      }
+      ctx.MediaPaths = nextPaths;
+      ctx.MediaTypes = nextTypes;
+      if (!ctx.MediaPath) {
+        ctx.MediaPath = nextPaths[0];
+      }
+    } catch (err) {
+      logVerbose(`failed to stage uploaded files to workspace: ${String(err)}`);
+    }
+  }
 
   const isFirstTurnInSession = isNewSession || !currentSystemSent;
   const isGroupChat = sessionCtx.ChatType === "group";

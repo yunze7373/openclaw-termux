@@ -129,9 +129,10 @@ export async function sendChatMessage(
             return null;
           }
           return {
-            type: "image",
+            type: att.mimeType.startsWith("image/") ? "image" : "file",
             mimeType: parsed.mimeType,
             content: parsed.content,
+            fileName: att.name,
           };
         })
         .filter((a): a is NonNullable<typeof a> => a !== null)

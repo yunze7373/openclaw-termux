@@ -17,7 +17,11 @@ import {
   isChatStopCommandText,
   resolveChatRunExpiresAtMs,
 } from "../chat-abort.js";
-import { type ChatImageContent, parseMessageWithAttachments } from "../chat-attachments.js";
+import {
+  type ChatFileContent,
+  type ChatImageContent,
+  parseMessageWithAttachments,
+} from "../chat-attachments.js";
 import { stripEnvelopeFromMessages } from "../chat-sanitize.js";
 import { GATEWAY_CLIENT_CAPS, hasGatewayClientCap } from "../protocol/client-info.js";
 import {
@@ -371,14 +375,17 @@ export const chatHandlers: GatewayRequestHandlers = {
     }
     let parsedMessage = p.message;
     let parsedImages: ChatImageContent[] = [];
-    if (normalizedAttachments.length > 0) {
+    let parsedFiles: ChatFileContent[] = [];
+    if (normalizedAttachments && normalizedAttachments.length > 0) {
       try {
         const parsed = await parseMessageWithAttachments(p.message, normalizedAttachments, {
-          maxBytes: 5_000_000,
-          log: context.logGateway,
+          log: {
+            warn: (m) => context.logGateway.warn(`webchat parseMessageWithAttachments: ${m}`),
+          },
         });
         parsedMessage = parsed.message;
         parsedImages = parsed.images;
+        parsedFiles = parsed.files;
       } catch (err) {
         respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, String(err)));
         return;
@@ -525,6 +532,7 @@ export const chatHandlers: GatewayRequestHandlers = {
           runId: clientRunId,
           abortSignal: abortController.signal,
           images: parsedImages.length > 0 ? parsedImages : undefined,
+          files: parsedFiles.length > 0 ? parsedFiles : undefined, // Pass files here
           disableBlockStreaming: true,
           onAgentRunStart: (runId) => {
             agentRunStarted = true;

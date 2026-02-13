@@ -13,9 +13,17 @@ export type ChatImageContent = {
   mimeType: string;
 };
 
-export type ParsedMessageWithImages = {
+export type ChatFileContent = {
+  type: "file";
+  data: string;
+  mimeType: string;
+  name: string;
+};
+
+export type ParsedMessageWithAttachments = {
   message: string;
   images: ChatImageContent[];
+  files: ChatFileContent[];
 };
 
 type AttachmentLog = {
@@ -63,14 +71,15 @@ export async function parseMessageWithAttachments(
   message: string,
   attachments: ChatAttachment[] | undefined,
   opts?: { maxBytes?: number; log?: AttachmentLog },
-): Promise<ParsedMessageWithImages> {
-  const maxBytes = opts?.maxBytes ?? 5_000_000; // 5 MB
+): Promise<ParsedMessageWithAttachments> {
+  const maxBytes = opts?.maxBytes ?? 10_000_000; // Increase to 10 MB for general files
   const log = opts?.log;
   if (!attachments || attachments.length === 0) {
-    return { message, images: [] };
+    return { message, images: [], files: [] };
   }
 
   const images: ChatImageContent[] = [];
+  const files: ChatFileContent[] = [];
 
   for (const [idx, att] of attachments.entries()) {
     if (!att) {
@@ -106,28 +115,25 @@ export async function parseMessageWithAttachments(
 
     const providedMime = normalizeMime(mime);
     const sniffedMime = normalizeMime(await sniffMimeFromBase64(b64));
-    if (sniffedMime && !isImageMime(sniffedMime)) {
-      log?.warn(`attachment ${label}: detected non-image (${sniffedMime}), dropping`);
-      continue;
-    }
-    if (!sniffedMime && !isImageMime(providedMime)) {
-      log?.warn(`attachment ${label}: unable to detect image mime type, dropping`);
-      continue;
-    }
-    if (sniffedMime && providedMime && sniffedMime !== providedMime) {
-      log?.warn(
-        `attachment ${label}: mime mismatch (${providedMime} -> ${sniffedMime}), using sniffed`,
-      );
-    }
+    const effectiveMime = sniffedMime ?? (providedMime || mime || "application/octet-stream");
 
-    images.push({
-      type: "image",
-      data: b64,
-      mimeType: sniffedMime ?? providedMime ?? mime,
-    });
+    if (isImageMime(effectiveMime)) {
+      images.push({
+        type: "image",
+        data: b64,
+        mimeType: effectiveMime,
+      });
+    } else {
+      files.push({
+        type: "file",
+        data: b64,
+        mimeType: effectiveMime,
+        name: att.fileName || `file-${idx + 1}`,
+      });
+    }
   }
 
-  return { message, images };
+  return { message, images, files };
 }
 
 /**
