@@ -168,4 +168,17 @@ describe("Gateway Bind Compatibility", () => {
       expect(result.data.gateway?.mode).toBeUndefined();
     }
   });
+
+  it('should handle legacy/misplaced values in mode: "network" -> "local"', () => {
+    const config = {
+      gateway: {
+        mode: "network",
+      },
+    };
+    const result = OpenClawSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.gateway?.mode).toBe("local");
+    }
+  });
 });

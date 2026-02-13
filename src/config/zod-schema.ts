@@ -375,16 +375,10 @@ export const OpenClawSchema = z
                 if (normalized === "") {
                   return undefined;
                 }
-                if (normalized === "lan" || normalized === "0.0.0.0" || normalized === "any") {
+                if (normalized === "lan" || normalized === "0.0.0.0" || normalized === "any" || normalized === "network") {
                   return "local";
                 }
-                if (normalized !== "local" && normalized !== "remote") {
-                  console.error(`[DEBUG] gateway.mode invalid string: "${normalized}"`);
-                }
                 return normalized;
-              }
-              if (val !== undefined && val !== null) {
-                console.error(`[DEBUG] gateway.mode received non-string value: type=${typeof val}, value=${JSON.stringify(val)}`);
               }
               return val;
             },
