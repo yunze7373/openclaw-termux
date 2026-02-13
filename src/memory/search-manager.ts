@@ -21,6 +21,33 @@ export async function getMemorySearchManager(params: {
   agentId: string;
 }): Promise<MemorySearchManagerResult> {
   const resolved = resolveMemoryBackendConfig(params);
+
+  if (resolved.backend === "supabase" && resolved.supabase) {
+    try {
+      const { SupabaseMemoryManager } = await import("./manager-supabase.js");
+      const manager = await SupabaseMemoryManager.create({
+        cfg: params.cfg,
+        agentId: params.agentId,
+        resolved,
+      });
+      if (manager) {
+        return { manager };
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log.warn(`supabase memory unavailable; falling back to builtin: ${message}`);
+    }
+    // Fall through to builtin
+    try {
+      const { MemoryIndexManager } = await import("./manager.js");
+      const manager = await MemoryIndexManager.get(params);
+      return { manager };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { manager: null, error: message };
+    }
+  }
+
   if (resolved.backend === "qmd" && resolved.qmd) {
     const cacheKey = buildQmdCacheKey(params.agentId, resolved.qmd);
     const cached = QMD_MANAGER_CACHE.get(cacheKey);
@@ -76,7 +103,7 @@ class FallbackMemoryManager implements MemorySearchManager {
       fallbackFactory: () => Promise<MemorySearchManager | null>;
     },
     private readonly onClose?: () => void,
-  ) {}
+  ) { }
 
   async search(
     query: string,
@@ -89,7 +116,7 @@ class FallbackMemoryManager implements MemorySearchManager {
         this.primaryFailed = true;
         this.lastError = err instanceof Error ? err.message : String(err);
         log.warn(`qmd memory failed; switching to builtin index: ${this.lastError}`);
-        await this.deps.primary.close?.().catch(() => {});
+        await this.deps.primary.close?.().catch(() => { });
         // Evict the failed wrapper so the next request can retry QMD with a fresh manager.
         this.evictCacheEntry();
       }

@@ -6,6 +6,7 @@ import type {
   MemoryCitationsMode,
   MemoryQmdConfig,
   MemoryQmdIndexPath,
+  MemorySupabaseConfig,
 } from "../config/types.memory.js";
 import { resolveAgentWorkspaceDir } from "../agents/agent-scope.js";
 import { parseDurationMs } from "../cli/parse-duration.js";
@@ -16,6 +17,20 @@ export type ResolvedMemoryBackendConfig = {
   backend: MemoryBackend;
   citations: MemoryCitationsMode;
   qmd?: ResolvedQmdConfig;
+  supabase?: ResolvedSupabaseConfig;
+};
+
+export type ResolvedSupabaseConfig = {
+  url: string;
+  key: string;
+  table: string;
+  rpcFunction: string;
+  ftsEnabled: boolean;
+  ftsFunction: string;
+  sessions: { enabled: boolean; retentionDays?: number };
+  syncIntervalMs: number;
+  maxResults: number;
+  minScore: number;
 };
 
 export type ResolvedQmdCollection = {
@@ -247,6 +262,33 @@ export function resolveMemoryBackendConfig(params: {
 }): ResolvedMemoryBackendConfig {
   const backend = params.cfg.memory?.backend ?? DEFAULT_BACKEND;
   const citations = params.cfg.memory?.citations ?? DEFAULT_CITATIONS;
+
+  if (backend === "supabase") {
+    const supabaseCfg = params.cfg.memory?.supabase;
+    const url = supabaseCfg?.url || process.env.SUPABASE_URL || "";
+    const key = supabaseCfg?.key || process.env.SUPABASE_SERVICE_KEY ||
+      process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || "";
+    if (!url || !key) {
+      return { backend: "builtin", citations };
+    }
+    const resolved: ResolvedSupabaseConfig = {
+      url,
+      key,
+      table: supabaseCfg?.table || process.env.MEMORY_TABLE || "memory_vectors",
+      rpcFunction: supabaseCfg?.rpcFunction || "match_memory_vectors",
+      ftsEnabled: supabaseCfg?.ftsEnabled !== false,
+      ftsFunction: supabaseCfg?.ftsFunction || "fts_memory_vectors",
+      sessions: {
+        enabled: supabaseCfg?.sessions?.enabled === true,
+        retentionDays: supabaseCfg?.sessions?.retentionDays,
+      },
+      syncIntervalMs: resolveIntervalMs(supabaseCfg?.syncInterval),
+      maxResults: supabaseCfg?.maxResults ?? 10,
+      minScore: supabaseCfg?.minScore ?? 0.5,
+    };
+    return { backend: "supabase", citations, supabase: resolved };
+  }
+
   if (backend !== "qmd") {
     return { backend: "builtin", citations };
   }
