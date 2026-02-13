@@ -90,4 +90,30 @@ describe("Gateway Bind Compatibility", () => {
     const result = OpenClawSchema.safeParse(config);
     expect(result.success).toBe(false);
   });
+
+  it('should handle whitespace in mode: "local " -> "local"', () => {
+    const config = {
+      gateway: {
+        mode: "local ",
+      },
+    };
+    const result = OpenClawSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.gateway?.mode).toBe("local");
+    }
+  });
+
+  it('should handle whitespace in mode: "remote " -> "remote"', () => {
+    const config = {
+      gateway: {
+        mode: "remote ",
+      },
+    };
+    const result = OpenClawSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.gateway?.mode).toBe("remote");
+    }
+  });
 });

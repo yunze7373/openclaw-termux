@@ -367,7 +367,9 @@ export const OpenClawSchema = z
     gateway: z
       .object({
         port: z.number().int().positive().optional(),
-        mode: z.union([z.literal("local"), z.literal("remote")]).optional(),
+        mode: z
+          .preprocess((val) => (typeof val === "string" ? val.trim() : val), z.union([z.literal("local"), z.literal("remote")]))
+          .optional(),
         bind: z
           .preprocess(
             (val) => {
