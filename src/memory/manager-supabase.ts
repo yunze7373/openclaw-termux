@@ -307,16 +307,22 @@ export class SupabaseMemoryManager implements MemorySearchManager {
     // Determine which sources to search
     const sources = this.settings.sources ?? ["memory"];
 
+    log.info(`[search] query="${trimmed.slice(0, 50)}" limit=${limit} minScore=${minScore} sources=${JSON.stringify(sources)}`);
+
     try {
       // Vector search
+      log.info(`[search] Generating query embedding...`);
       const embedding = await this.provider.embedQuery(trimmed);
+      log.info(`[search] Embedding generated (${embedding.length} dims), calling vector search...`);
       const vectorResults = await this.vectorSearch(embedding, limit * 2, sources);
+      log.info(`[search] Vector search returned ${vectorResults.length} results`);
 
       // Full-text search (if enabled)
       let ftsResults: RawSearchRow[] = [];
       if (this.supabaseConfig.ftsEnabled) {
         try {
           ftsResults = await this.ftsSearch(trimmed, limit * 2, sources);
+          log.info(`[search] FTS returned ${ftsResults.length} results`);
         } catch (err) {
           log.debug(`FTS search failed, using vector only: ${String(err)}`);
         }
@@ -324,9 +330,10 @@ export class SupabaseMemoryManager implements MemorySearchManager {
 
       // Hybrid merge + dedup
       const merged = this.hybridMerge(vectorResults, ftsResults, limit);
+      log.info(`[search] After merge: ${merged.length} results, scores: ${merged.slice(0, 3).map(r => r.score.toFixed(3)).join(", ")}`);
 
       // Filter by minScore and convert to MemorySearchResult
-      return merged
+      const filtered = merged
         .filter((r) => r.score >= minScore)
         .slice(0, limit)
         .map((r) => ({
@@ -337,6 +344,8 @@ export class SupabaseMemoryManager implements MemorySearchManager {
           snippet: r.snippet,
           source: r.source as MemorySource,
         }));
+      log.info(`[search] After minScore filter (>=${minScore}): ${filtered.length} results`);
+      return filtered;
     } catch (err) {
       log.error(`Supabase search failed: ${String(err)}`);
       return [];
@@ -346,33 +355,50 @@ export class SupabaseMemoryManager implements MemorySearchManager {
   private async vectorSearch(
     embedding: number[],
     limit: number,
-    sources: string[],
+    _sources: string[],
   ): Promise<RawSearchRow[]> {
-    const data = (await this.client.rpc(this.supabaseConfig.rpcFunction, {
+    // Only pass parameters that the RPC function accepts
+    // (match_memory_vectors expects: query_embedding, match_count)
+    const rpcParams: Record<string, unknown> = {
       query_embedding: embedding,
       match_count: limit,
-      filter_sources: sources.length > 0 ? sources : undefined,
-    })) as Array<{
-      id?: number;
-      path?: string;
-      content?: string;
-      text?: string;
-      similarity?: number;
-      metadata?: Record<string, unknown>;
-    }>;
+    };
+    log.debug(`[vectorSearch] Calling RPC ${this.supabaseConfig.rpcFunction} with match_count=${limit}`);
 
-    if (!Array.isArray(data)) return [];
+    try {
+      const data = (await this.client.rpc(this.supabaseConfig.rpcFunction, rpcParams)) as Array<{
+        id?: number;
+        path?: string;
+        content?: string;
+        text?: string;
+        similarity?: number;
+        metadata?: Record<string, unknown>;
+      }>;
 
-    return data.map((row) => ({
-      id: String(row.id ?? ""),
-      path: String(row.path ?? ""),
-      snippet: String(row.content ?? row.text ?? ""),
-      score: Number(row.similarity ?? 0),
-      startLine: Number((row.metadata as any)?.startLine ?? 0),
-      endLine: Number((row.metadata as any)?.endLine ?? 0),
-      source: String((row.metadata as any)?.source ?? "memory"),
-      searchType: "vector" as const,
-    }));
+      if (!Array.isArray(data)) {
+        log.warn(`[vectorSearch] RPC returned non-array: ${typeof data}`);
+        return [];
+      }
+
+      log.debug(`[vectorSearch] Got ${data.length} raw results`);
+      if (data.length > 0) {
+        log.debug(`[vectorSearch] First result: path=${data[0].path} similarity=${data[0].similarity}`);
+      }
+
+      return data.map((row) => ({
+        id: String(row.id ?? ""),
+        path: String(row.path ?? ""),
+        snippet: String(row.content ?? row.text ?? ""),
+        score: Number(row.similarity ?? 0),
+        startLine: Number((row.metadata as any)?.startLine ?? 0),
+        endLine: Number((row.metadata as any)?.endLine ?? 0),
+        source: String((row.metadata as any)?.source ?? "memory"),
+        searchType: "vector" as const,
+      }));
+    } catch (err) {
+      log.error(`[vectorSearch] RPC call failed: ${String(err)}`);
+      return [];
+    }
   }
 
   private async ftsSearch(
