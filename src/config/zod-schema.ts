@@ -82,11 +82,33 @@ const MemoryQmdSchema = z
   })
   .strict();
 
+const MemorySupabaseSchema = z
+  .object({
+    url: z.string().optional(),
+    key: z.string().optional(),
+    table: z.string().optional(),
+    rpcFunction: z.string().optional(),
+    ftsEnabled: z.boolean().optional(),
+    ftsFunction: z.string().optional(),
+    sessions: z
+      .object({
+        enabled: z.boolean().optional(),
+        retentionDays: z.number().int().nonnegative().optional(),
+      })
+      .strict()
+      .optional(),
+    syncInterval: z.string().optional(),
+    maxResults: z.number().int().positive().optional(),
+    minScore: z.number().min(0).max(1).optional(),
+  })
+  .strict();
+
 const MemorySchema = z
   .object({
-    backend: z.union([z.literal("builtin"), z.literal("qmd")]).optional(),
+    backend: z.union([z.literal("builtin"), z.literal("qmd"), z.literal("supabase")]).optional(),
     citations: z.union([z.literal("auto"), z.literal("on"), z.literal("off")]).optional(),
     qmd: MemoryQmdSchema.optional(),
+    supabase: MemorySupabaseSchema.optional(),
   })
   .strict()
   .optional();
