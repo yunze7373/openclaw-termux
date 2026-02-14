@@ -414,10 +414,12 @@ export class SupabaseMemoryManager implements MemorySearchManager {
     log.info(`Syncing memory to Supabase (reason: ${params?.reason ?? "manual"})...`);
 
     // 1. Collect all files to sync
+    log.info(`[sync-step-1] Listing memory files from: ${this.workspaceDir}`);
     const memoryFiles = await listMemoryFiles(
       this.workspaceDir,
       this.settings.extraPaths,
     );
+    log.info(`[sync-step-1] Found ${memoryFiles.length} memory files`);
 
     // 2. Collect session files if enabled
     let sessionFiles: string[] = [];
@@ -425,7 +427,9 @@ export class SupabaseMemoryManager implements MemorySearchManager {
       this.supabaseConfig.sessions.enabled &&
       this.settings.sources.includes("sessions")
     ) {
+      log.info(`[sync-step-2] Listing session files...`);
       sessionFiles = await listSessionFilesForAgent(this.agentId);
+      log.info(`[sync-step-2] Found ${sessionFiles.length} session files`);
     }
 
     const totalFiles = memoryFiles.length + sessionFiles.length;
@@ -436,7 +440,9 @@ export class SupabaseMemoryManager implements MemorySearchManager {
     // 3. Sync memory files (incremental)
     for (const file of memoryFiles) {
       try {
+        log.info(`[sync-step-3] Syncing file: ${path.basename(file)}`);
         await this.syncFile(file, "memory", params?.force);
+        log.info(`[sync-step-3] Done: ${path.basename(file)}`);
       } catch (err) {
         log.warn(`Failed to sync ${file}: ${String(err)}`);
       }
@@ -464,6 +470,7 @@ export class SupabaseMemoryManager implements MemorySearchManager {
     }
 
     // 5. Clean up deleted files
+    log.info(`[sync-step-5] Cleaning up deleted files...`);
     await this.cleanupDeletedFiles(memoryFiles);
 
     log.info(`Supabase sync completed (${processed} files processed).`);
@@ -480,6 +487,7 @@ export class SupabaseMemoryManager implements MemorySearchManager {
     source: MemorySource,
     force?: boolean,
   ): Promise<void> {
+    log.debug(`[syncFile] buildFileEntry: ${absPath}`);
     const entry = await buildFileEntry(absPath, this.workspaceDir);
 
     // Incremental check: skip if file hash hasn't changed
@@ -489,7 +497,9 @@ export class SupabaseMemoryManager implements MemorySearchManager {
       return;
     }
 
+    log.debug(`[syncFile] Reading file: ${entry.path}`);
     const content = await fs.readFile(absPath, "utf-8");
+    log.debug(`[syncFile] Chunking: ${content.length} chars`);
     const chunks = chunkMarkdown(content, this.settings.chunking);
 
     if (chunks.length === 0) return;
@@ -511,19 +521,26 @@ export class SupabaseMemoryManager implements MemorySearchManager {
     }
 
     // Delete existing chunks for this path, then re-insert all
+    log.info(`[syncFile] Deleting old chunks for: ${entry.path}`);
     await this.client.delete(this.supabaseConfig.table, { path: entry.path });
 
     // Generate embeddings in batch
     const texts = chunks.map((c) => c.text);
+    log.info(`[syncFile] Generating embeddings for ${chunks.length} chunks...`);
     let embeddings: number[][];
     try {
+      log.info(`[syncFile] Trying embedBatch...`);
       embeddings = await this.provider.embedBatch(texts);
-    } catch {
+      log.info(`[syncFile] embedBatch succeeded`);
+    } catch (batchErr) {
       // Fallback to serial
+      log.info(`[syncFile] embedBatch failed (${String(batchErr)}), falling back to serial...`);
       embeddings = [];
-      for (const text of texts) {
-        embeddings.push(await this.provider.embedQuery(text));
+      for (let i = 0; i < texts.length; i++) {
+        log.debug(`[syncFile] embedQuery ${i + 1}/${texts.length}`);
+        embeddings.push(await this.provider.embedQuery(texts[i]));
       }
+      log.info(`[syncFile] Serial embedding complete`);
     }
 
     // Build rows for upsert
@@ -541,7 +558,9 @@ export class SupabaseMemoryManager implements MemorySearchManager {
       },
     }));
 
+    log.info(`[syncFile] Inserting ${rows.length} rows to Supabase...`);
     await this.client.insert(this.supabaseConfig.table, rows);
+    log.info(`[syncFile] Insert complete`);
 
     // Update hash cache
     this.syncedHashes.set(entry.path, {
