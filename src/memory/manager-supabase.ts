@@ -149,10 +149,11 @@ export class SupabaseMemoryManager implements MemorySearchManager {
   private readonly client: SupabaseRestClient;
   private provider: EmbeddingProvider;
 
-  // Incremental sync state (in-memory)
+  // Incremental sync state (in-memory, preloaded from Supabase on startup)
   private readonly syncedHashes = new Map<string, ChunkHashRecord>();
   private syncTimer: ReturnType<typeof setInterval> | null = null;
   private closed = false;
+  private syncing = false; // Mutex to prevent concurrent syncs
 
   // -----------------------------------------------------------------------
   // Factory
@@ -199,6 +200,9 @@ export class SupabaseMemoryManager implements MemorySearchManager {
       provider: providerResult.provider,
     });
 
+    // Preload hash cache from Supabase (so restart doesn't re-embed everything)
+    await manager.preloadHashCache();
+
     // Start periodic sync if configured
     if (supabaseConfig.syncIntervalMs > 0) {
       manager.syncTimer = setInterval(() => {
@@ -208,13 +212,55 @@ export class SupabaseMemoryManager implements MemorySearchManager {
       }, supabaseConfig.syncIntervalMs);
     }
 
-    // Initial sync on creation
+    // Initial sync on creation (lightweight — only processes changed files)
     void manager.sync({ reason: "boot" }).catch((err) => {
       log.warn(`Initial sync failed: ${String(err)}`);
     });
 
     log.info(`Supabase memory manager initialized (agent: ${params.agentId})`);
     return manager;
+  }
+
+  /** Preload hash cache from Supabase metadata to skip unchanged files on restart */
+  private async preloadHashCache(): Promise<void> {
+    try {
+      log.info(`[preload] Loading existing file hashes from Supabase...`);
+      const rows = (await this.client.select(
+        this.supabaseConfig.table,
+        "select=path,metadata&order=path",
+      )) as Array<{ path?: string; metadata?: Record<string, unknown> }>;
+
+      // Group by path and collect chunk hashes
+      const byPath = new Map<string, { fileHash: string; chunkHashes: string[] }>();
+      for (const row of rows) {
+        const p = String(row.path ?? "");
+        const meta = row.metadata ?? {};
+        const fileHash = String(meta.fileHash ?? "");
+        const chunkHash = String(meta.hash ?? "");
+
+        if (!p || !fileHash) continue;
+
+        const existing = byPath.get(p);
+        if (existing) {
+          existing.chunkHashes.push(chunkHash);
+        } else {
+          byPath.set(p, { fileHash, chunkHashes: [chunkHash] });
+        }
+      }
+
+      for (const [p, data] of byPath) {
+        this.syncedHashes.set(p, {
+          path: p,
+          fileHash: data.fileHash,
+          chunkHashes: data.chunkHashes,
+        });
+      }
+
+      log.info(`[preload] Loaded ${byPath.size} file hashes (${rows.length} chunks) from Supabase`);
+    } catch (err) {
+      log.warn(`[preload] Failed to preload hash cache: ${String(err)}`);
+      // Non-fatal: sync will just re-process everything
+    }
   }
 
   private constructor(params: {
@@ -411,6 +457,25 @@ export class SupabaseMemoryManager implements MemorySearchManager {
   }): Promise<void> {
     if (this.closed) return;
 
+    // Mutex: skip if another sync is already in progress
+    if (this.syncing) {
+      log.info(`Sync already in progress, skipping (reason: ${params?.reason ?? "manual"})`);
+      return;
+    }
+    this.syncing = true;
+
+    try {
+      await this._doSync(params);
+    } finally {
+      this.syncing = false;
+    }
+  }
+
+  private async _doSync(params?: {
+    reason?: string;
+    force?: boolean;
+    progress?: (update: MemorySyncProgressUpdate) => void;
+  }): Promise<void> {
     log.info(`Syncing memory to Supabase (reason: ${params?.reason ?? "manual"})...`);
 
     // 1. Collect all files to sync
