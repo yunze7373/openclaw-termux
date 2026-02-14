@@ -175,13 +175,15 @@ export class SupabaseMemoryManager implements MemorySearchManager {
     }
 
     // Create embedding provider using OpenClaw's standard provider system
+    // Force fallback to "none" — Supabase backend MUST use remote embeddings,
+    // never local node-llama-cpp (which doesn't work on Termux/Android).
     let providerResult: { provider: EmbeddingProvider };
     try {
       providerResult = await createEmbeddingProvider({
         config: params.cfg,
         provider: settings.provider,
         model: settings.model,
-        fallback: settings.fallback,
+        fallback: "none",
         remote: settings.remote,
         local: settings.local,
       });
@@ -189,6 +191,8 @@ export class SupabaseMemoryManager implements MemorySearchManager {
       log.error(`Failed to create embedding provider: ${String(err)}`);
       return null;
     }
+
+    log.info(`Embedding provider: ${providerResult.provider.id} (model: ${providerResult.provider.model})`);
 
     const workspaceDir = resolveAgentWorkspaceDir(params.cfg, params.agentId);
     const manager = new SupabaseMemoryManager({
