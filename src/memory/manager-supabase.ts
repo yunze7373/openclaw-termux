@@ -358,9 +358,11 @@ export class SupabaseMemoryManager implements MemorySearchManager {
     _sources: string[],
   ): Promise<RawSearchRow[]> {
     // Only pass parameters that the RPC function accepts
-    // (match_memory_vectors expects: query_embedding, match_count)
+    // match_memory_vectors(query_embedding, match_threshold, match_count)
+    // match_threshold=0.0 returns all results; our code filters by minScore.
     const rpcParams: Record<string, unknown> = {
       query_embedding: embedding,
+      match_threshold: 0.0,
       match_count: limit,
     };
     log.debug(`[vectorSearch] Calling RPC ${this.supabaseConfig.rpcFunction} with match_count=${limit}`);
