@@ -128,3 +128,7 @@ memory/
 /GEMINI.md
 /XIAOJI.md
 /PROJECT-CONTEXT.md
+
+.agent/
+.gemini/
+.agent/workflows/upgrade_termux.md
