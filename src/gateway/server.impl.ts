@@ -16,6 +16,7 @@ import {
   loadConfig,
   migrateLegacyConfig,
   readConfigFileSnapshot,
+  OpenClawSchema,
   writeConfigFile,
 } from "../config/config.js";
 import { applyPluginAutoEnable } from "../config/plugin-auto-enable.js";
@@ -191,6 +192,54 @@ export async function startGatewayServer(
   }
 
   configSnapshot = await readConfigFileSnapshot();
+
+  // Auto-strip unrecognized config keys (e.g. stale or manually-added keys like "web_search")
+  // instead of crashing the gateway.  This mirrors `openclaw doctor --fix` behaviour.
+  if (configSnapshot.exists && configSnapshot.config) {
+    const parseResult = OpenClawSchema.safeParse(configSnapshot.config);
+    if (!parseResult.success) {
+      const unrecognizedKeys: string[] = [];
+      const cleaned = structuredClone(configSnapshot.config);
+      for (const issue of parseResult.error.issues) {
+        if (issue.code === "unrecognized_keys") {
+          const uIssue = issue as typeof issue & { keys: PropertyKey[] };
+          const parentPath = issue.path.filter(
+            (p: PropertyKey): p is string | number => typeof p !== "symbol",
+          );
+          let target: unknown = cleaned;
+          for (const part of parentPath) {
+            if (target && typeof target === "object" && !Array.isArray(target)) {
+              target = (target as Record<string, unknown>)[String(part)];
+            } else if (Array.isArray(target) && typeof part === "number") {
+              target = target[part];
+            } else {
+              target = undefined;
+            }
+          }
+          if (target && typeof target === "object" && !Array.isArray(target)) {
+            const record = target as Record<string, unknown>;
+            for (const key of uIssue.keys) {
+              if (typeof key === "string" && key in record) {
+                delete record[key];
+                const keyPath = parentPath.length > 0 ? `${parentPath.join(".")}.${key}` : key;
+                unrecognizedKeys.push(keyPath);
+              }
+            }
+          }
+        }
+      }
+      if (unrecognizedKeys.length > 0) {
+        await writeConfigFile(cleaned);
+        log.warn(
+          `gateway: auto-removed unrecognized config keys:\n${unrecognizedKeys
+            .map((k) => `- ${k}`)
+            .join("\n")}`,
+        );
+        configSnapshot = await readConfigFileSnapshot();
+      }
+    }
+  }
+
   if (configSnapshot.exists && !configSnapshot.valid) {
     const issues =
       configSnapshot.issues.length > 0
