@@ -511,7 +511,7 @@ export class SupabaseMemoryManager implements MemorySearchManager {
     log.info(`Syncing memory to Supabase (reason: ${params?.reason ?? "manual"})...`);
 
     // 1. Collect all files to sync
-    log.info(`[sync-step-1] Listing memory files from: ${this.workspaceDir}`);
+    log.debug(`[sync-step-1] Listing memory files from: ${this.workspaceDir}`);
     const memoryFiles = await listMemoryFiles(
       this.workspaceDir,
       this.settings.extraPaths,
@@ -537,9 +537,9 @@ export class SupabaseMemoryManager implements MemorySearchManager {
     // 3. Sync memory files (incremental)
     for (const file of memoryFiles) {
       try {
-        log.info(`[sync-step-3] Syncing file: ${path.basename(file)}`);
+        log.debug(`[sync-step-3] Syncing file: ${path.basename(file)}`);
         await this.syncFile(file, "memory", params?.force);
-        log.info(`[sync-step-3] Done: ${path.basename(file)}`);
+        log.debug(`[sync-step-3] Done: ${path.basename(file)}`);
       } catch (err) {
         log.warn(`Failed to sync ${file}: ${String(err)}`);
       }
@@ -567,7 +567,7 @@ export class SupabaseMemoryManager implements MemorySearchManager {
     }
 
     // 5. Clean up deleted files
-    log.info(`[sync-step-5] Cleaning up deleted files...`);
+    log.debug(`[sync-step-5] Cleaning up deleted files...`);
     await this.cleanupDeletedFiles(memoryFiles);
 
     log.info(`Supabase sync completed (${processed} files processed).`);
