@@ -600,48 +600,68 @@ build_project() {
         if ! pnpm build > "$BUILD_LOG" 2>&1; then
             # 检查是否是 rolldown/canvas:a2ui:bundle 失败（CPU 指令不兼容）
             if grep -qE "Illegal instruction|SIGILL|Invalid machine instruction|rolldown" "$BUILD_LOG" 2>/dev/null; then
-                # rolldown 依赖 CPU 指令集（Rust 编译）无法在此设备运行
-                # 直接从 npm 下载已发布的预构建 dist/
+                # rolldown (Rust 二进制) 在此 CPU 上不可用
+                # 回退：使用 esbuild（Go 二进制，有 ARM 预构建，不会 SIGILL）
                 stop_spinner "false" "本地编译不可用 (rolldown CPU 不兼容)"
-                print_substep "   从 npm 下载预构建版本..."
-                start_spinner "下载预构建 dist/ (无需编译)..."
+                print_substep "   使用 esbuild 作为备用编译器..."
+                start_spinner "安装 esbuild 并编译 (ARM 兼容)..."
                 
-                local PKG_NAME
-                PKG_NAME=$(node -e "process.stdout.write(require('./package.json').name)" 2>/dev/null || echo "openclaw-android")
-                local PKG_VERSION
-                PKG_VERSION=$(node -e "process.stdout.write(require('./package.json').version)" 2>/dev/null || echo "latest")
-                local TMP_PACK
-                TMP_PACK=$(mktemp -d)
+                # 确保 esbuild 可用（有 ARM 预构建二进制）
+                if ! command -v esbuild &>/dev/null && ! npx --yes esbuild --version &>/dev/null 2>&1; then
+                    npm install -g esbuild > /dev/null 2>&1 || true
+                fi
+                local ESBUILD_CMD="npx --yes esbuild"
+                if command -v esbuild &>/dev/null; then
+                    ESBUILD_CMD="esbuild"
+                fi
                 
-                # 用 npm pack 拉取 tarball（不触发任何本地编译）
-                if (cd "$TMP_PACK" && npm pack "${PKG_NAME}@${PKG_VERSION}" --ignore-scripts > /dev/null 2>&1) || \
-                   (cd "$TMP_PACK" && npm pack "${PKG_NAME}" --ignore-scripts > /dev/null 2>&1); then
-                    local TARBALL
-                    TARBALL=$(ls "$TMP_PACK"/*.tgz 2>/dev/null | head -1)
-                    if [[ -n "$TARBALL" ]]; then
-                        tar -xzf "$TARBALL" -C "$TMP_PACK" 2>/dev/null
-                        if [[ -d "$TMP_PACK/package/dist" ]]; then
-                            rm -rf "$PROJECT_ROOT/dist"
-                            cp -r "$TMP_PACK/package/dist" "$PROJECT_ROOT/dist"
-                            stop_spinner "true" "已获取预构建 dist/ (来自 npm)"
-                            rm -rf "$TMP_PACK"
-                        else
-                            stop_spinner "false" "npm 包中未找到 dist/"
-                            rm -rf "$TMP_PACK"
-                            exit 1
-                        fi
-                    else
-                        stop_spinner "false" "npm pack 未生成 tarball"
-                        rm -rf "$TMP_PACK"
-                        exit 1
+                # esbuild 编译各入口点（--packages=external 保留 node_modules 引用）
+                local ESBUILD_FLAGS="--bundle --platform=node --format=esm --packages=external --define:process.env.NODE_ENV='\"production\"' --external:@napi-rs/canvas --external:@napi-rs/canvas-android-arm64"
+                local ESBUILD_OK=true
+                
+                mkdir -p dist dist/infra dist/cli dist/plugin-sdk dist/hooks
+                
+                for entry in src/index.ts src/entry.ts src/infra/warning-filter.ts src/cli/daemon-cli.ts src/extensionAPI.ts; do
+                    local outfile="dist/${entry#src/}"
+                    outfile="${outfile%.ts}.js"
+                    mkdir -p "$(dirname "$outfile")"
+                    # shellcheck disable=SC2086
+                    if ! $ESBUILD_CMD "$entry" $ESBUILD_FLAGS --outfile="$outfile" >> "$BUILD_LOG" 2>&1; then
+                        ESBUILD_OK=false; break
                     fi
+                done
+                
+                if $ESBUILD_OK; then
+                    # plugin-sdk 入口
+                    # shellcheck disable=SC2086
+                    $ESBUILD_CMD src/plugin-sdk/index.ts src/plugin-sdk/account-id.ts $ESBUILD_FLAGS --outdir=dist/plugin-sdk >> "$BUILD_LOG" 2>&1 || ESBUILD_OK=false
+                fi
+                
+                if $ESBUILD_OK; then
+                    # hooks 入口
+                    find src/hooks/bundled -name 'handler.ts' 2>/dev/null | while IFS= read -r hfile; do
+                        local hout="dist/${hfile#src/}"
+                        hout="${hout%.ts}.js"
+                        mkdir -p "$(dirname "$hout")"
+                        # shellcheck disable=SC2086
+                        $ESBUILD_CMD "$hfile" $ESBUILD_FLAGS --outfile="$hout" >> "$BUILD_LOG" 2>&1 || true
+                    done
+                    # shellcheck disable=SC2086
+                    $ESBUILD_CMD src/hooks/llm-slug-generator.ts $ESBUILD_FLAGS --outfile=dist/hooks/llm-slug-generator.js >> "$BUILD_LOG" 2>&1 || true
+                fi
+                
+                if $ESBUILD_OK; then
+                    # post-build 脚本（write-build-info 等，纯 Node.js 可运行）
+                    node --import tsx scripts/write-build-info.ts >> "$BUILD_LOG" 2>&1 || true
+                    node --import tsx scripts/write-cli-compat.ts >> "$BUILD_LOG" 2>&1 || true
+                    node --import tsx scripts/copy-hook-metadata.ts >> "$BUILD_LOG" 2>&1 || true
+                    stop_spinner "true" "esbuild 编译完成 (ARM 兼容备用方案)"
                 else
-                    stop_spinner "false" "npm pack 失败 (网络错误?)"
-                    rm -rf "$TMP_PACK"
+                    stop_spinner "false" "esbuild 编译也失败"
                     echo ""
-                    echo -e "${YELLOW}此设备 CPU 不支持 rolldown，且无法下载预构建版本${NC}"
-                    echo -e "${YELLOW}请检查网络连接后重试${NC}"
-                    echo ""
+                    echo -e "${RED}━━━━━━━━━━━━━ 构建失败详情 ━━━━━━━━━━━━━${NC}"
+                    tail -n 20 "$BUILD_LOG" 2>/dev/null
+                    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                     exit 1
                 fi
             else

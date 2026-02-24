@@ -648,38 +648,65 @@ build_project() {
         if ! $TSDOWN_CMD > "$BUILD_LOG" 2>&1; then
             # Check if it's a SIGILL / rolldown CPU incompatibility
             if grep -qE "Illegal instruction|SIGILL|Invalid machine instruction|rolldown" "$BUILD_LOG" 2>/dev/null; then
+                # rolldown (Rust binary) is incompatible with this CPU
+                # Fallback: use esbuild (Go binary with ARM prebuilts, no SIGILL)
                 stop_spinner "false" "tsdown/rolldown CPU incompatible (SIGILL)"
-                print_substep "   Downloading pre-built dist/ from npm instead..."
-                start_spinner "Fetching pre-built dist/ (no local compilation)..."
+                print_substep "   Falling back to esbuild (ARM-compatible)..."
+                start_spinner "Installing esbuild and compiling (ARM-compatible)..."
                 
-                local PKG_NAME
-                PKG_NAME=$(node -e "process.stdout.write(require('./package.json').name)" 2>/dev/null || echo "openclaw-android")
-                local PKG_VERSION
-                PKG_VERSION=$(node -e "process.stdout.write(require('./package.json').version)" 2>/dev/null || echo "latest")
-                local TMP_PACK
-                TMP_PACK=$(mktemp -d)
+                # Ensure esbuild is available (prebuilt Go binary for ARM)
+                if ! command -v esbuild &>/dev/null && ! npx --yes esbuild --version &>/dev/null 2>&1; then
+                    npm install -g esbuild > /dev/null 2>&1 || true
+                fi
+                local ESBUILD_CMD="npx --yes esbuild"
+                if command -v esbuild &>/dev/null; then
+                    ESBUILD_CMD="esbuild"
+                fi
                 
-                if (cd "$TMP_PACK" && npm pack "${PKG_NAME}@${PKG_VERSION}" --ignore-scripts > /dev/null 2>&1) || \
-                   (cd "$TMP_PACK" && npm pack "${PKG_NAME}" --ignore-scripts > /dev/null 2>&1); then
-                    local TARBALL
-                    TARBALL=$(ls "$TMP_PACK"/*.tgz 2>/dev/null | head -1)
-                    if [[ -n "$TARBALL" ]] && tar -xzf "$TARBALL" -C "$TMP_PACK" 2>/dev/null && [[ -d "$TMP_PACK/package/dist" ]]; then
-                        rm -rf "$PROJECT_ROOT/dist"
-                        cp -r "$TMP_PACK/package/dist" "$PROJECT_ROOT/dist"
-                        stop_spinner "true" "Pre-built dist/ fetched from npm"
-                        rm -rf "$TMP_PACK"
-                    else
-                        stop_spinner "false" "npm pack tarball missing dist/"
-                        rm -rf "$TMP_PACK"
-                        exit 1
+                # Build all entry points without rolldown (--packages=external keeps node_modules refs)
+                local ESBUILD_FLAGS="--bundle --platform=node --format=esm --packages=external --define:process.env.NODE_ENV='\"production\"' --external:@napi-rs/canvas --external:@napi-rs/canvas-android-arm64"
+                local ESBUILD_OK=true
+                
+                mkdir -p dist dist/infra dist/cli dist/plugin-sdk dist/hooks
+                
+                for entry in src/index.ts src/entry.ts src/infra/warning-filter.ts src/cli/daemon-cli.ts src/extensionAPI.ts; do
+                    local outfile="dist/${entry#src/}"
+                    outfile="${outfile%.ts}.js"
+                    mkdir -p "$(dirname "$outfile")"
+                    # shellcheck disable=SC2086
+                    if ! $ESBUILD_CMD "$entry" $ESBUILD_FLAGS --outfile="$outfile" >> "$BUILD_LOG" 2>&1; then
+                        ESBUILD_OK=false; break
                     fi
+                done
+                
+                if $ESBUILD_OK; then
+                    # shellcheck disable=SC2086
+                    $ESBUILD_CMD src/plugin-sdk/index.ts src/plugin-sdk/account-id.ts $ESBUILD_FLAGS --outdir=dist/plugin-sdk >> "$BUILD_LOG" 2>&1 || ESBUILD_OK=false
+                fi
+                
+                if $ESBUILD_OK; then
+                    find src/hooks/bundled -name 'handler.ts' 2>/dev/null | while IFS= read -r hfile; do
+                        local hout="dist/${hfile#src/}"
+                        hout="${hout%.ts}.js"
+                        mkdir -p "$(dirname "$hout")"
+                        # shellcheck disable=SC2086
+                        $ESBUILD_CMD "$hfile" $ESBUILD_FLAGS --outfile="$hout" >> "$BUILD_LOG" 2>&1 || true
+                    done
+                    # shellcheck disable=SC2086
+                    $ESBUILD_CMD src/hooks/llm-slug-generator.ts $ESBUILD_FLAGS --outfile=dist/hooks/llm-slug-generator.js >> "$BUILD_LOG" 2>&1 || true
+                fi
+                
+                if $ESBUILD_OK; then
+                    node --import tsx scripts/write-build-info.ts >> "$BUILD_LOG" 2>&1 || true
+                    node --import tsx scripts/write-cli-compat.ts >> "$BUILD_LOG" 2>&1 || true
+                    node --import tsx scripts/copy-hook-metadata.ts >> "$BUILD_LOG" 2>&1 || true
+                    stop_spinner "true" "esbuild compilation complete (ARM-compatible fallback)"
                 else
-                    stop_spinner "false" "npm pack failed (network error?)"
-                    rm -rf "$TMP_PACK"
+                    stop_spinner "false" "esbuild also failed"
                     echo ""
-                    echo -e "${YELLOW}This CPU cannot run rolldown, and pre-built download also failed.${NC}"
-                    echo -e "${YELLOW}Please check your network connection and retry.${NC}"
-                    echo ""
+                    echo -e "${RED}━━━━━━━━━━━━━ ERROR LOG ━━━━━━━━━━━━━${NC}"
+                    tail -n 20 "$BUILD_LOG" 2>/dev/null
+                    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                     exit 1
                 fi
             else
