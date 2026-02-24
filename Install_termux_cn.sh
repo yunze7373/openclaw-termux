@@ -786,9 +786,19 @@ main() {
             
             print_step "拉取最新代码"
             cd "$PROJECT_ROOT"
-            git fetch origin > /dev/null 2>&1
-            git checkout main > /dev/null 2>&1
-            git reset --hard origin/main > /dev/null 2>&1
+            
+            # 清理本地修改和未跟踪的文件
+            print_substep "清理工作目录..."
+            git fetch origin > /dev/null 2>&1 || print_warn "git fetch 失败，继续..."
+            git stash > /dev/null 2>&1 || true
+            git clean -fd > /dev/null 2>&1 || true
+            git checkout -- . > /dev/null 2>&1 || true
+            
+            # 确保在 main 分支且完全同步
+            print_substep "切换到 main 分支..."
+            git checkout main > /dev/null 2>&1 || { print_error "无法切换到 main 分支"; exit 1; }
+            git reset --hard origin/main > /dev/null 2>&1 || { print_error "无法同步 main 分支"; exit 1; }
+            
             print_success "代码已更新"
             
             print_step "构建项目"
