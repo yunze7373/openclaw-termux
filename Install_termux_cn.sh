@@ -512,7 +512,13 @@ setup_service() {
     if [[ "$PLATFORM" == "termux" ]]; then
         if check_command pm2; then
             pm2 delete openclaw-gateway > /dev/null 2>&1 || true
-            pm2 start "$OPENCLAW_BIN" --name openclaw-gateway --interpreter node -- gateway start > /dev/null 2>&1
+            # Termux: 使用完整的 PM2 配置以确保日志正确捕获
+            pm2 start "$OPENCLAW_BIN" \
+                --name openclaw-gateway \
+                --interpreter node \
+                --merge-logs \
+                --time \
+                -- gateway start
             pm2 save > /dev/null 2>&1
             print_success "PM2 服务已配置"
         else
