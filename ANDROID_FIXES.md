@@ -775,3 +775,33 @@ Added a comprehensive Termux compatibility layer in `skills-install.ts`:
 - Node global installs (clawhub, mcporter, oracle) now succeed with proper PNPM_HOME.
 - Go-based skills properly install to `~/go/bin`.
 - Future skills from ClawdHub will automatically benefit from these compatibility mappings.
+## 54. Playwright-core SIGILL on Import (Termux/Android)
+
+**Issue:**
+Gateway crashes at startup with:
+```
+Error: Unsupported platform: android
+    at /node_modules/.pnpm/playwright-core@1.58.2/node_modules/playwright-core/lib/server/registry/index.js:486:13
+```
+
+The `playwright-core` module validates platform support at import time. It checks `os.platform()` and rejects `"android"` with SIGILL, even before any browser functionality is used.
+
+This prevented the gateway from starting on Termux/Android, blocking all other features that don't require browser automation.
+
+**Solution:**
+We conditionally skip importing `playwright-core` on Termux/Android platforms:
+
+*   **File Modified:** `src/browser/pw-session.ts`
+*   **Changes:**
+    1.  Detect Termux/Android at module load time via `process.platform === "android"` or `TERMUX_VERSION` env var.
+    2.  Skip loading `chromium` from `playwright-core` on unsupported platforms.
+    3.  Added early guard in `connectBrowser()` function to throw a clear error if browser tools are invoked:
+        ```
+        "Browser tools are not supported on Android/Termux. 
+         If you need browser functionality, please use openclaw on a desktop/server platform."
+        ```
+
+**Result:**
+- Gateway starts successfully on Termux without SIGILL crashes.
+- Browser/web automation tools gracefully report "not supported" rather than crashing the entire process.
+- All other gateway features (API keys, models, data sync, etc.) work normally on Android.
