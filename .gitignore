@@ -7,6 +7,8 @@ pnpm-lock.yaml
 bun.lock
 bun.lockb
 coverage
+__pycache__/
+*.pyc
 .tsbuildinfo
 .pnpm-store
 .worktrees/
@@ -15,6 +17,19 @@ coverage
 ui/src/ui/__screenshots__/
 ui/playwright-report/
 ui/test-results/
+packages/dashboard-next/.next/
+packages/dashboard-next/out/
+
+# Mise configuration files
+mise.toml
+
+# Android build artifacts
+apps/android/.gradle/
+apps/android/app/build/
+apps/android/.cxx/
+
+# Mise configuration files
+mise.toml
 
 # Android build artifacts
 apps/android/.gradle/
@@ -25,6 +40,8 @@ apps/android/.cxx/
 *.bun-build
 apps/macos/.build/
 apps/shared/MoltbotKit/.build/
+apps/shared/OpenClawKit/.build/
+apps/shared/OpenClawKit/Package.resolved
 **/ModuleCache/
 bin/
 bin/clawdbot-mac
@@ -32,10 +49,13 @@ bin/docs-list
 apps/macos/.build-local/
 apps/macos/.swiftpm/
 apps/shared/MoltbotKit/.swiftpm/
+apps/shared/OpenClawKit/.swiftpm/
 Core/
 apps/ios/*.xcodeproj/
 apps/ios/*.xcworkspace/
 apps/ios/.swiftpm/
+apps/ios/.derivedData/
+apps/ios/.local-signing.xcconfig
 vendor/
 apps/ios/Clawdbot.xcodeproj/
 apps/ios/Clawdbot.xcodeproj/**
@@ -67,9 +87,11 @@ apps/ios/*.mobileprovision
 
 # Local untracked files
 .local/
+docs/.local/
 IDENTITY.md
 USER.md
 .tgz
+.idea
 
 # local tooling
 .serena/
@@ -78,53 +100,14 @@ USER.md
 /memory/
 .agent/*.json
 !.agent/workflows/
-local/
-
-.gemini/
-gha-creds-*.json
-
-# ===========================
-# Termux 私有仓库专用忽略规则
-# ===========================
-
-# --- 归档目录 (临时文件/过期脚本) ---
-archive/
-
-# --- 日志文件 ---
-*.log
-logs/
-
-# --- 个人身份文件 (核心隐私) ---
-MEMORY.md
-SOUL.md
-HEARTBEAT.md
-TOOLS.md
-
-# --- 敏感凭证 ---
-*.pem
-*.key
-id_rsa*
-id_ed25519*
-.netrc
-.npmrc.local
-
-# --- 临时文件 ---
-*.tar.gz
-*.orig
-*.bak
-*.tmp
+/local/
 package-lock.json
+.claude/settings.local.json
+.agents/
+.agent/
 
-# --- 记忆目录 ---
-memory/
-
-# --- 缓存 ---
-.cache/
-.clawdhub/cache/
-
-# Personal workspace files (contains private info)
-/AGENTS.md
-/CODEX.md
-/GEMINI.md
-/XIAOJI.md
-/PROJECT-CONTEXT.md
+# Local iOS signing overrides
+apps/ios/LocalSigning.xcconfig
+# Generated protocol schema (produced via pnpm protocol:gen)
+dist/protocol.schema.json
+.ant-colony/

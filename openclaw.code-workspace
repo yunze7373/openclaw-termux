@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"name": "openclaw-termux (当前)",
+			"path": "."
+		},
+		{
+			"name": "openclaw (上游)",
+			"path": "../openclaw"
+		},
+		{
+			"name": "OpenClaw-备份",
+			"path": "G:/マイドライブ/OpenClaw_Backups/openclaw-backup-20260211-074147/data/data/com.termux/files/home"
+		}
+	],
+	"settings": {
+		"typescript.reportStyleChecksAsWarnings": false,
+		"typescript.tsdk": "node_modules/typescript/lib",
+		"typescript.experimental.useTsgo": true
+	}
+}

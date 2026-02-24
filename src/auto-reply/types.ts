@@ -20,6 +20,8 @@ export type GetReplyOptions = {
   abortSignal?: AbortSignal;
   /** Optional inbound images (used for webchat attachments). */
   images?: ImageContent[];
+  /** Optional inbound files (non-image attachments). */
+  files?: Array<{ data: string; mimeType: string; name: string }>;
   /** Notifies when an agent run actually starts (useful for webchat command handling). */
   onAgentRunStart?: (runId: string) => void;
   onReplyStart?: () => Promise<void> | void;
@@ -27,10 +29,20 @@ export type GetReplyOptions = {
   onTypingCleanup?: () => void;
   onTypingController?: (typing: TypingController) => void;
   isHeartbeat?: boolean;
+  /** Resolved heartbeat model override (provider/model string from merged per-agent config). */
+  heartbeatModelOverride?: string;
+  /** If true, suppress tool error warning payloads for this run. */
+  suppressToolErrorWarnings?: boolean;
   onPartialReply?: (payload: ReplyPayload) => Promise<void> | void;
   onReasoningStream?: (payload: ReplyPayload) => Promise<void> | void;
+  /** Called when a thinking/reasoning block ends. */
+  onReasoningEnd?: () => Promise<void> | void;
+  /** Called when a new assistant message starts (e.g., after tool call or thinking block). */
+  onAssistantMessageStart?: () => Promise<void> | void;
   onBlockReply?: (payload: ReplyPayload, context?: BlockReplyContext) => Promise<void> | void;
   onToolResult?: (payload: ReplyPayload) => Promise<void> | void;
+  /** Called when a tool phase starts/updates, before summary payloads are emitted. */
+  onToolStart?: (payload: { name?: string; phase?: string }) => Promise<void> | void;
   /** Called when the actual model is selected (including after fallback).
    * Use this to get model/provider/thinkLevel for responsePrefix template interpolation. */
   onModelSelected?: (ctx: ModelSelectedContext) => void;
@@ -41,6 +53,8 @@ export type GetReplyOptions = {
   skillFilter?: string[];
   /** Mutable ref to track if a reply was sent (for Slack "first" threading mode). */
   hasRepliedRef?: { value: boolean };
+  /** Override agent timeout in seconds (0 = no timeout). Threads through to resolveAgentTimeoutMs. */
+  timeoutOverrideSeconds?: number;
 };
 
 export type ReplyPayload = {
