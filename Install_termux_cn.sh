@@ -512,15 +512,14 @@ setup_service() {
     if [[ "$PLATFORM" == "termux" ]]; then
         if check_command pm2; then
             pm2 delete openclaw-gateway > /dev/null 2>&1 || true
-            # Termux: 使用完整的 PM2 配置以确保日志正确捕获
-            # 重要：指定 --cwd 和 --env 确保环境正确
-            pm2 start "$OPENCLAW_BIN" \
+            # Termux: 直接启动 Node.js 脚本，确保参数正确传递
+            # 使用 openclaw.mjs 而不是链接的 OPENCLAW_BIN，以确保 PM2 正确处理参数
+            pm2 start node \
                 --name openclaw-gateway \
-                --interpreter node \
                 --cwd "$PROJECT_ROOT" \
                 --merge-logs \
                 --time \
-                -- gateway start
+                -- "$PROJECT_ROOT/openclaw.mjs" gateway start
             pm2 save > /dev/null 2>&1
             print_success "PM2 服务已配置"
         else
