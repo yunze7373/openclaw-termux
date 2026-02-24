@@ -6,7 +6,6 @@ import { getMachineDisplayName } from "../infra/machine-name.js";
 import { ensureOpenClawCliOnPath } from "../infra/path-env.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
 import { VERSION } from "../version.js";
-import { sendAndroidNotification } from "../platform/android/notify.js";
 import { ensureNodeHostConfig, saveNodeHostConfig, type NodeHostGatewayConfig } from "./config.js";
 import {
   coerceNodeInvokePayload,
@@ -123,7 +122,6 @@ export async function runNodeHost(opts: NodeHostRunOptions): Promise<void> {
     commands: [
       "system.run",
       "system.which",
-      ...(notifySupported ? ["system.notify"] : []),
       "system.execApprovals.get",
       "system.execApprovals.set",
       ...(browserProxyEnabled ? ["browser.proxy"] : []),
