@@ -1,8 +1,9 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { AssistantIdentity } from "../assistant-identity.ts";
-import type { MessageGroup } from "../types/chat-types.ts";
 import { toSanitizedMarkdownHtml } from "../markdown.ts";
+import { detectTextDirection } from "../text-direction.ts";
+import type { MessageGroup } from "../types/chat-types.ts";
 import { renderCopyAsMarkdownButton } from "./copy-as-markdown.ts";
 import {
   extractTextCached,
@@ -194,6 +195,37 @@ function isAvatarUrl(value: string): boolean {
   );
 }
 
+type FileBlock = {
+  name: string;
+  mimeType?: string;
+  url?: string;
+};
+
+function extractFiles(message: unknown): FileBlock[] {
+  const m = message as Record<string, unknown>;
+  const content = m.content;
+  const files: FileBlock[] = [];
+
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      if (typeof block !== "object" || block === null) {
+        continue;
+      }
+      const b = block as Record<string, unknown>;
+
+      if (b.type === "file") {
+        files.push({
+          name: (b.fileName as string) || (b.name as string) || "file",
+          mimeType: b.mimeType as string,
+          url: b.url as string,
+        });
+      }
+    }
+  }
+
+  return files;
+}
+
 function renderMessageImages(images: ImageBlock[]) {
   if (images.length === 0) {
     return nothing;
@@ -209,6 +241,25 @@ function renderMessageImages(images: ImageBlock[]) {
             class="chat-message-image"
             @click=${() => window.open(img.url, "_blank")}
           />
+        `,
+      )}
+    </div>
+  `;
+}
+
+function renderMessageFiles(files: FileBlock[]) {
+  if (files.length === 0) {
+    return nothing;
+  }
+
+  return html`
+    <div class="chat-message-files">
+      ${files.map(
+        (file) => html`
+          <div class="chat-message-file" title="${file.name}">
+            <span class="chat-message-file__icon">📄</span>
+            <span class="chat-message-file__name">${file.name}</span>
+          </div>
         `,
       )}
     </div>
@@ -233,6 +284,8 @@ function renderGroupedMessage(
   const hasToolCards = toolCards.length > 0;
   const images = extractImages(message);
   const hasImages = images.length > 0;
+  const files = extractFiles(message);
+  const hasFiles = files.length > 0;
 
   const extractedText = extractTextCached(message);
   const extractedThinking =
@@ -255,7 +308,7 @@ function renderGroupedMessage(
     return html`${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}`;
   }
 
-  if (!markdown && !hasToolCards && !hasImages) {
+  if (!markdown && !hasToolCards && !hasImages && !hasFiles) {
     return nothing;
   }
 
@@ -263,6 +316,7 @@ function renderGroupedMessage(
     <div class="${bubbleClasses}">
       ${canCopyMarkdown ? renderCopyAsMarkdownButton(markdown!) : nothing}
       ${renderMessageImages(images)}
+      ${renderMessageFiles(files)}
       ${
         reasoningMarkdown
           ? html`<div class="chat-thinking">${unsafeHTML(
@@ -272,7 +326,7 @@ function renderGroupedMessage(
       }
       ${
         markdown
-          ? html`<div class="chat-text">${unsafeHTML(toSanitizedMarkdownHtml(markdown))}</div>`
+          ? html`<div class="chat-text" dir="${detectTextDirection(markdown)}">${unsafeHTML(toSanitizedMarkdownHtml(markdown))}</div>`
           : nothing
       }
       ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}

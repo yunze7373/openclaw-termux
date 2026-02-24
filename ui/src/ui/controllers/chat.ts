@@ -1,6 +1,6 @@
+import { extractText } from "../chat/message-extract.ts";
 import type { GatewayBrowserClient } from "../gateway.ts";
 import type { ChatAttachment } from "../ui-types.ts";
-import { extractText } from "../chat/message-extract.ts";
 import { generateUUID } from "../uuid.ts";
 
 export type ChatState = {
@@ -17,6 +17,8 @@ export type ChatState = {
   chatStream: string | null;
   chatStreamStartedAt: number | null;
   lastError: string | null;
+  selectedModelId: string | null;
+  chatModels: unknown[];
 };
 
 export type ChatEventPayload = {
@@ -49,6 +51,18 @@ export async function loadChatHistory(state: ChatState) {
     state.chatLoading = false;
   }
 }
+    
+export async function loadChatModels(state: ChatState) {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  try {
+    const res = (await state.client.request("models.list", {})) as { models?: unknown[] };
+    state.chatModels = Array.isArray(res.models) ? res.models : [];
+  } catch (err) {
+    console.error("Failed to load models:", err);
+  }
+}
 
 function dataUrlToBase64(dataUrl: string): { content: string; mimeType: string } | null {
   const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
@@ -58,10 +72,60 @@ function dataUrlToBase64(dataUrl: string): { content: string; mimeType: string }
   return { mimeType: match[1], content: match[2] };
 }
 
+type AssistantMessageNormalizationOptions = {
+  roleRequirement: "required" | "optional";
+  roleCaseSensitive?: boolean;
+  requireContentArray?: boolean;
+  allowTextField?: boolean;
+};
+
+function normalizeAssistantMessage(
+  message: unknown,
+  options: AssistantMessageNormalizationOptions,
+): Record<string, unknown> | null {
+  if (!message || typeof message !== "object") {
+    return null;
+  }
+  const candidate = message as Record<string, unknown>;
+  const roleValue = candidate.role;
+  if (typeof roleValue === "string") {
+    const role = options.roleCaseSensitive ? roleValue : roleValue.toLowerCase();
+    if (role !== "assistant") {
+      return null;
+    }
+  } else if (options.roleRequirement === "required") {
+    return null;
+  }
+
+  if (options.requireContentArray) {
+    return Array.isArray(candidate.content) ? candidate : null;
+  }
+  if (!("content" in candidate) && !(options.allowTextField && "text" in candidate)) {
+    return null;
+  }
+  return candidate;
+}
+
+function normalizeAbortedAssistantMessage(message: unknown): Record<string, unknown> | null {
+  return normalizeAssistantMessage(message, {
+    roleRequirement: "required",
+    roleCaseSensitive: true,
+    requireContentArray: true,
+  });
+}
+
+function normalizeFinalAssistantMessage(message: unknown): Record<string, unknown> | null {
+  return normalizeAssistantMessage(message, {
+    roleRequirement: "optional",
+    allowTextField: true,
+  });
+}
+
 export async function sendChatMessage(
   state: ChatState,
   message: string,
   attachments?: ChatAttachment[],
+  modelId?: string | null,
 ): Promise<string | null> {
   if (!state.client || !state.connected) {
     return null;
@@ -114,9 +178,10 @@ export async function sendChatMessage(
             return null;
           }
           return {
-            type: "image",
+            type: att.mimeType.startsWith("image/") ? "image" : "file",
             mimeType: parsed.mimeType,
             content: parsed.content,
+            fileName: att.name,
           };
         })
         .filter((a): a is NonNullable<typeof a> => a !== null)
@@ -129,6 +194,7 @@ export async function sendChatMessage(
       deliver: false,
       idempotencyKey: runId,
       attachments: apiAttachments,
+      modelId,
     });
     return runId;
   } catch (err) {
@@ -180,6 +246,11 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   // See https://github.com/openclaw/openclaw/issues/1909
   if (payload.runId && state.chatRunId && payload.runId !== state.chatRunId) {
     if (payload.state === "final") {
+      const finalMessage = normalizeFinalAssistantMessage(payload.message);
+      if (finalMessage) {
+        state.chatMessages = [...state.chatMessages, finalMessage];
+        return null;
+      }
       return "final";
     }
     return null;
@@ -194,10 +265,30 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       }
     }
   } else if (payload.state === "final") {
+    const finalMessage = normalizeFinalAssistantMessage(payload.message);
+    if (finalMessage) {
+      state.chatMessages = [...state.chatMessages, finalMessage];
+    }
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
   } else if (payload.state === "aborted") {
+    const normalizedMessage = normalizeAbortedAssistantMessage(payload.message);
+    if (normalizedMessage) {
+      state.chatMessages = [...state.chatMessages, normalizedMessage];
+    } else {
+      const streamedText = state.chatStream ?? "";
+      if (streamedText.trim()) {
+        state.chatMessages = [
+          ...state.chatMessages,
+          {
+            role: "assistant",
+            content: [{ type: "text", text: streamedText }],
+            timestamp: Date.now(),
+          },
+        ];
+      }
+    }
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;

@@ -256,7 +256,7 @@ export async function startGatewayBonjourAdvertiser(
         );
       }
     }
-  }, 60_000);
+  }, process.env.TERMUX_VERSION ? 300_000 : 60_000);
   watchdog.unref?.();
 
   return {

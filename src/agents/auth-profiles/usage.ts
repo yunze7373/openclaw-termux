@@ -1,9 +1,25 @@
 import type { OpenClawConfig } from "../../config/config.js";
-import type { AuthProfileFailureReason, AuthProfileStore, ProfileUsageStats } from "./types.js";
 import { normalizeProviderId } from "../model-selection.js";
 import { saveAuthProfileStore, updateAuthProfileStoreWithLock } from "./store.js";
+import type { AuthProfileFailureReason, AuthProfileStore, ProfileUsageStats } from "./types.js";
 
-function resolveProfileUnusableUntil(stats: ProfileUsageStats): number | null {
+const FAILURE_REASON_PRIORITY: AuthProfileFailureReason[] = [
+  "auth",
+  "billing",
+  "format",
+  "model_not_found",
+  "timeout",
+  "rate_limit",
+  "unknown",
+];
+const FAILURE_REASON_SET = new Set<AuthProfileFailureReason>(FAILURE_REASON_PRIORITY);
+const FAILURE_REASON_ORDER = new Map<AuthProfileFailureReason, number>(
+  FAILURE_REASON_PRIORITY.map((reason, index) => [reason, index]),
+);
+
+export function resolveProfileUnusableUntil(
+  stats: Pick<ProfileUsageStats, "cooldownUntil" | "disabledUntil">,
+): number | null {
   const values = [stats.cooldownUntil, stats.disabledUntil]
     .filter((value): value is number => typeof value === "number")
     .filter((value) => Number.isFinite(value) && value > 0);
@@ -24,6 +40,156 @@ export function isProfileInCooldown(store: AuthProfileStore, profileId: string):
   const unusableUntil = resolveProfileUnusableUntil(stats);
   return unusableUntil ? Date.now() < unusableUntil : false;
 }
+
+function isActiveUnusableWindow(until: number | undefined, now: number): boolean {
+  return typeof until === "number" && Number.isFinite(until) && until > 0 && now < until;
+}
+
+/**
+ * Infer the most likely reason all candidate profiles are currently unavailable.
+ *
+ * We prefer explicit active `disabledReason` values (for example billing/auth)
+ * over generic cooldown buckets, then fall back to failure-count signals.
+ */
+export function resolveProfilesUnavailableReason(params: {
+  store: AuthProfileStore;
+  profileIds: string[];
+  now?: number;
+}): AuthProfileFailureReason | null {
+  const now = params.now ?? Date.now();
+  const scores = new Map<AuthProfileFailureReason, number>();
+  const addScore = (reason: AuthProfileFailureReason, value: number) => {
+    if (!FAILURE_REASON_SET.has(reason) || value <= 0 || !Number.isFinite(value)) {
+      return;
+    }
+    scores.set(reason, (scores.get(reason) ?? 0) + value);
+  };
+
+  for (const profileId of params.profileIds) {
+    const stats = params.store.usageStats?.[profileId];
+    if (!stats) {
+      continue;
+    }
+
+    const disabledActive = isActiveUnusableWindow(stats.disabledUntil, now);
+    if (disabledActive && stats.disabledReason && FAILURE_REASON_SET.has(stats.disabledReason)) {
+      // Disabled reasons are explicit and high-signal; weight heavily.
+      addScore(stats.disabledReason, 1_000);
+      continue;
+    }
+
+    const cooldownActive = isActiveUnusableWindow(stats.cooldownUntil, now);
+    if (!cooldownActive) {
+      continue;
+    }
+
+    let recordedReason = false;
+    for (const [rawReason, rawCount] of Object.entries(stats.failureCounts ?? {})) {
+      const reason = rawReason as AuthProfileFailureReason;
+      const count = typeof rawCount === "number" ? rawCount : 0;
+      if (!FAILURE_REASON_SET.has(reason) || count <= 0) {
+        continue;
+      }
+      addScore(reason, count);
+      recordedReason = true;
+    }
+    if (!recordedReason) {
+      addScore("rate_limit", 1);
+    }
+  }
+
+  if (scores.size === 0) {
+    return null;
+  }
+
+  let best: AuthProfileFailureReason | null = null;
+  let bestScore = -1;
+  let bestPriority = Number.MAX_SAFE_INTEGER;
+  for (const reason of FAILURE_REASON_PRIORITY) {
+    const score = scores.get(reason);
+    if (typeof score !== "number") {
+      continue;
+    }
+    const priority = FAILURE_REASON_ORDER.get(reason) ?? Number.MAX_SAFE_INTEGER;
+    if (score > bestScore || (score === bestScore && priority < bestPriority)) {
+      best = reason;
+      bestScore = score;
+      bestPriority = priority;
+    }
+  }
+  return best;
+}
+export function getSoonestCooldownExpiry(
+  store: AuthProfileStore,
+  profileIds: string[],
+): number | null {
+  let soonest: number | null = null;
+  for (const id of profileIds) {
+    const stats = store.usageStats?.[id];
+    if (!stats) {
+      continue;
+    }
+    const until = resolveProfileUnusableUntil(stats);
+    if (typeof until !== "number" || !Number.isFinite(until) || until <= 0) {
+      continue;
+    }
+    if (soonest === null || until < soonest) {
+      soonest = until;
+    }
+  }
+  return soonest;
+}
+
+export function clearExpiredCooldowns(store: AuthProfileStore, now?: number): boolean {
+  const usageStats = store.usageStats;
+  if (!usageStats) {
+    return false;
+  }
+
+  const ts = now ?? Date.now();
+  let mutated = false;
+
+  for (const [profileId, stats] of Object.entries(usageStats)) {
+    if (!stats) {
+      continue;
+    }
+
+    let profileMutated = false;
+    const cooldownExpired =
+      typeof stats.cooldownUntil === "number" &&
+      Number.isFinite(stats.cooldownUntil) &&
+      stats.cooldownUntil > 0 &&
+      ts >= stats.cooldownUntil;
+    const disabledExpired =
+      typeof stats.disabledUntil === "number" &&
+      Number.isFinite(stats.disabledUntil) &&
+      stats.disabledUntil > 0 &&
+      ts >= stats.disabledUntil;
+
+    if (cooldownExpired) {
+      stats.cooldownUntil = undefined;
+      profileMutated = true;
+    }
+    if (disabledExpired) {
+      stats.disabledUntil = undefined;
+      stats.disabledReason = undefined;
+      profileMutated = true;
+    }
+
+    if (profileMutated && !resolveProfileUnusableUntil(stats)) {
+      stats.errorCount = 0;
+      stats.failureCounts = undefined;
+    }
+
+    if (profileMutated) {
+      usageStats[profileId] = stats;
+      mutated = true;
+    }
+  }
+
+  return mutated;
+}
+
 
 /**
  * Mark a profile as successfully used. Resets error count and updates lastUsed.
@@ -157,6 +323,17 @@ export function resolveProfileUnusableUntilForDisplay(
   return resolveProfileUnusableUntil(stats);
 }
 
+function keepActiveWindowOrRecompute(params: {
+  existingUntil: number | undefined;
+  now: number;
+  recomputedUntil: number;
+}): number {
+  const { existingUntil, now, recomputedUntil } = params;
+  const hasActiveWindow =
+    typeof existingUntil === "number" && Number.isFinite(existingUntil) && existingUntil > now;
+  return hasActiveWindow ? existingUntil : recomputedUntil;
+}
+
 function computeNextProfileUsageStats(params: {
   existing: ProfileUsageStats;
   now: number;
@@ -188,11 +365,23 @@ function computeNextProfileUsageStats(params: {
       baseMs: params.cfgResolved.billingBackoffMs,
       maxMs: params.cfgResolved.billingMaxMs,
     });
-    updatedStats.disabledUntil = params.now + backoffMs;
+    // Keep active disable windows immutable so retries within the window cannot
+    // extend recovery time indefinitely.
+    updatedStats.disabledUntil = keepActiveWindowOrRecompute({
+      existingUntil: params.existing.disabledUntil,
+      now: params.now,
+      recomputedUntil: params.now + backoffMs,
+    });
     updatedStats.disabledReason = "billing";
   } else {
     const backoffMs = calculateAuthProfileCooldownMs(nextErrorCount);
-    updatedStats.cooldownUntil = params.now + backoffMs;
+    // Keep active cooldown windows immutable so retries within the window
+    // cannot push recovery further out.
+    updatedStats.cooldownUntil = keepActiveWindowOrRecompute({
+      existingUntil: params.existing.cooldownUntil,
+      now: params.now,
+      recomputedUntil: params.now + backoffMs,
+    });
   }
 
   return updatedStats;
@@ -301,6 +490,9 @@ export async function clearAuthProfileCooldown(params: {
         ...freshStore.usageStats[profileId],
         errorCount: 0,
         cooldownUntil: undefined,
+        disabledUntil: undefined,
+        disabledReason: undefined,
+        failureCounts: undefined,
       };
       return true;
     },
@@ -317,6 +509,9 @@ export async function clearAuthProfileCooldown(params: {
     ...store.usageStats[profileId],
     errorCount: 0,
     cooldownUntil: undefined,
+    disabledUntil: undefined,
+    disabledReason: undefined,
+    failureCounts: undefined,
   };
   saveAuthProfileStore(store, agentDir);
 }
