@@ -513,9 +513,11 @@ setup_service() {
         if check_command pm2; then
             pm2 delete openclaw-gateway > /dev/null 2>&1 || true
             # Termux: 使用完整的 PM2 配置以确保日志正确捕获
+            # 重要：指定 --cwd 和 --env 确保环境正确
             pm2 start "$OPENCLAW_BIN" \
                 --name openclaw-gateway \
                 --interpreter node \
+                --cwd "$PROJECT_ROOT" \
                 --merge-logs \
                 --time \
                 -- gateway start
