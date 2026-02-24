@@ -185,43 +185,77 @@ check_command() {
 # ============================================================================
 
 install_termux_deps() {
-    print_substep "检查系统包更新..."
-    local UPGRADABLE
-    # 等待可能正在运行的其他pkg命令完成
+    print_substep "清理包管理器锁..."
+    # 杀死任何可能持有锁的 apt 进程
+    pkill -f "apt|pkg" 2>/dev/null || true
+    sleep 1
+    
+    # 移除陈旧的锁文件
+    rm -f /data/data/com.termux/files/usr/var/lib/dpkg/lock-frontend 2>/dev/null || true
+    rm -f /data/data/com.termux/files/usr/var/lib/dpkg/lock 2>/dev/null || true
+    sleep 1
+    
     print_substep "等待包管理器就绪..."
-    local wait_time=0
-    local max_wait=300  # 最多等待5分钟
-    while lsof /data/data/com.termux/files/usr/var/lib/dpkg/lock-frontend &>/dev/null 2>&1; do
-        if [[ $wait_time -gt $max_wait ]]; then
-            print_warn "包管理器被锁定，尝试强制释放..."
-            pkill -9 apt &>/dev/null || true
-            sleep 2
+    local wait_count=0
+    local max_attempts=15
+    
+    # 等待包管理器锁可用
+    while [[ $wait_count -lt $max_attempts ]]; do
+        if flock -n /data/data/com.termux/files/usr/var/lib/apt/lock -c "echo ok" &>/dev/null 2>&1; then
+            print_success "包管理器已准备好"
             break
         fi
-        sleep 2
-        wait_time=$((wait_time + 2))
+        wait_count=$((wait_count + 1))
+        if [[ $wait_count -eq 5 ]]; then
+            print_warn "包管理器仍被锁定，强制清理..."
+            pkill -9 -f "apt|pkg" 2>/dev/null || true
+            rm -f /data/data/com.termux/files/usr/var/lib/dpkg/lock* 2>/dev/null || true
+            sleep 2
+        else
+            sleep 2
+        fi
     done
     
-    print_substep "更新包列表..."
-    if ! pkg update -y 2>&1 | tail -3; then
-        print_error "包列表更新失败"
-        exit 1
-    fi
+    # 更新包列表 (带重试)
+    print_substep "更新包列表 (尝试 1/3)..."
+    local update_attempt=1
+    while [[ $update_attempt -le 3 ]]; do
+        if pkg update -y 2>&1 | tail -2; then
+            break
+        fi
+        update_attempt=$((update_attempt + 1))
+        if [[ $update_attempt -le 3 ]]; then
+            print_warn "更新失败，重试 (尝试 $update_attempt/3)..."
+            sleep 3
+        fi
+    done
     
+    # 检查可升级的包
+    local UPGRADABLE
     UPGRADABLE=$(apt list --upgradable 2>/dev/null | wc -l || echo 0)
     UPGRADABLE=$((UPGRADABLE - 1))  # 减去表头行
+    
     if [[ "$UPGRADABLE" -gt 0 ]]; then
         print_warn "检测到 $UPGRADABLE 个可升级的包，正在升级..."
         print_substep "这可能需要几分钟时间，具体取决于包的大小..."
         
-        # 显示实时升级进度
-        if ! pkg upgrade -y 2>&1 | grep -E "^(Processing|Unpacking|Setting up|^[^ ])" | while read line; do
-            print_substep "   $line"
-        done; then
-            print_error "系统包升级失败"
-            exit 1
-        fi
-        print_success "系统包已升级"
+        # 显示实时升级进度 (带重试)
+        local upgrade_attempt=1
+        while [[ $upgrade_attempt -le 3 ]]; do
+            if pkg upgrade -y 2>&1 | grep -E "^(Processing|Unpacking|Setting up|Preparing|Configuring|^[a-zA-Z0-9])" | while read line; do
+                print_substep "   $line"
+            done; then
+                print_success "系统包已升级"
+                break
+            fi
+            upgrade_attempt=$((upgrade_attempt + 1))
+            if [[ $upgrade_attempt -le 3 ]]; then
+                print_warn "升级失败，5秒后重试 (尝试 $upgrade_attempt/3)..."
+                sleep 5
+            elif [[ $upgrade_attempt -gt 3 ]]; then
+                print_warn "升级失败 3 次，继续安装..."
+            fi
+        done
     else
         print_success "系统包已是最新"
     fi
@@ -229,16 +263,28 @@ install_termux_deps() {
     print_substep "安装基础工具 (nodejs-lts, git, openssh, build-essential 等)..."
     print_substep "这可能需要几分钟时间，请耐心等待..."
     
-    # 显示实时安装进度，限制频率以避免过度输出
-    if ! pkg install -y nodejs-lts git openssh curl wget jq python golang rust build-essential mpv proot tailscale cloudflared 2>&1 | while read line; do
-        # 显示进度行但限制频率
-        if [[ "$line" =~ ^(Processing|Unpacking|Setting up|Reading|Building|Get:|Hit:|Ign:|^[a-z0-9\-]+:) ]]; then
-            print_substep "   $line"
+    # 带重试暄安装，以确保可靠性
+    local install_attempt=1
+    while [[ $install_attempt -le 2 ]]; do
+        if ! pkg install -y --fix-broken nodejs-lts git openssh curl wget jq python golang rust build-essential mpv proot tailscale cloudflared 2>&1 | while read line; do
+            # 显示进度行，但限制频率以避免过度输出
+            if [[ "$line" =~ ^(Processing|Unpacking|Setting up|Reading|Building|Get:|Hit:|Ign:|^[a-z0-9\-]+:) ]]; then
+                print_substep "   $line"
+            fi
+        done; then
+            if [[ $install_attempt -lt 2 ]]; then
+                print_warn "安装失败，重试 (尝试 $((install_attempt + 1))/2)..."
+                pkill -f "apt|pkg" 2>/dev/null || true
+                sleep 3
+                install_attempt=$((install_attempt + 1))
+            else
+                print_error "基础工具安装失败 2 次"
+                exit 1
+            fi
+        else
+            break
         fi
-    done; then
-        print_error "基础工具安装失败"
-        exit 1
-    fi
+    done
     print_success "nodejs-lts, git, curl, jq 及其他工具"
     
     if ! check_command pnpm; then

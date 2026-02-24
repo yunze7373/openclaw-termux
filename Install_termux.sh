@@ -202,28 +202,77 @@ check_command() {
 # ============================================================================
 
 install_termux_deps() {
-    print_substep "Checking system package updates..."
+    print_substep "Cleaning up package manager locks..."
+    # Kill any stray apt processes that might hold locks
+    pkill -f "apt|pkg" 2>/dev/null || true
+    sleep 1
+    
+    # Remove stale lock files
+    rm -f /data/data/com.termux/files/usr/var/lib/dpkg/lock-frontend 2>/dev/null || true
+    rm -f /data/data/com.termux/files/usr/var/lib/dpkg/lock 2>/dev/null || true
+    sleep 1
+    
+    print_substep "Waiting for package manager to be ready..."
+    local wait_count=0
+    local max_attempts=15
+    
+    # Wait for package manager lock to be available
+    while [[ $wait_count -lt $max_attempts ]]; do
+        if flock -n /data/data/com.termux/files/usr/var/lib/apt/lock -c "echo ok" &>/dev/null 2>&1; then
+            print_success "Package manager ready"
+            break
+        fi
+        wait_count=$((wait_count + 1))
+        if [[ $wait_count -eq 5 ]]; then
+            print_warn "Package manager still locked, force cleaning..."
+            pkill -9 -f "apt|pkg" 2>/dev/null || true
+            rm -f /data/data/com.termux/files/usr/var/lib/dpkg/lock* 2>/dev/null || true
+            sleep 2
+        else
+            sleep 2
+        fi
+    done
+    
+    # Update package lists with retries
+    print_substep "Updating package lists (attempt 1/3)..."
+    local update_attempt=1
+    while [[ $update_attempt -le 3 ]]; do
+        if pkg update -y 2>&1 | tail -2; then
+            break
+        fi
+        update_attempt=$((update_attempt + 1))
+        if [[ $update_attempt -le 3 ]]; then
+            print_warn "Update failed, retrying (attempt $update_attempt/3)..."
+            sleep 3
+        fi
+    done
+    
+    # Check for upgradable packages
     local UPGRADABLE
-    local UPDATE_OUTPUT
-    UPDATE_OUTPUT=$(pkg update -y 2>&1)
-    UPGRADABLE=$(echo "$UPDATE_OUTPUT" | grep -c "can be upgraded" 2>/dev/null || true)
-    UPGRADABLE=${UPGRADABLE:-0}
-    UPGRADABLE=${UPGRADABLE//[^0-9]/}  # Remove any non-numeric characters
-    if [[ -z "$UPGRADABLE" ]] || [[ "$UPGRADABLE" -eq 0 ]]; then
-        UPGRADABLE=0
-    fi
+    UPGRADABLE=$(apt list --upgradable 2>/dev/null | wc -l || echo 0)
+    UPGRADABLE=$((UPGRADABLE - 1))  # subtract header line
+    
     if [[ "$UPGRADABLE" -gt 0 ]]; then
         print_warn "Found $UPGRADABLE upgradable packages, upgrading..."
         print_substep "This may take several minutes depending on package size..."
         
-        # Show real-time upgrade progress
-        if ! pkg upgrade -y 2>&1 | grep -E "^(Processing|Unpacking|Setting up|^[^ ])" | while read line; do
-            print_substep "   $line"
-        done; then
-            print_error "System package upgrade failed"
-            exit 1
-        fi
-        print_success "System packages upgraded"
+        # Show real-time upgrade progress with retries
+        local upgrade_attempt=1
+        while [[ $upgrade_attempt -le 3 ]]; do
+            if pkg upgrade -y 2>&1 | grep -E "^(Processing|Unpacking|Setting up|Preparing|Configuring|^[a-zA-Z0-9])" | while read line; do
+                print_substep "   $line"
+            done; then
+                print_success "System packages upgraded"
+                break
+            fi
+            upgrade_attempt=$((upgrade_attempt + 1))
+            if [[ $upgrade_attempt -le 3 ]]; then
+                print_warn "Upgrade failed, retrying (attempt $upgrade_attempt/3) in 5 seconds..."
+                sleep 5
+            elif [[ $upgrade_attempt -gt 3 ]]; then
+                print_warn "Upgrade failed after 3 attempts, continuing with installation..."
+            fi
+        done
     else
         print_success "System packages up to date"
     fi
@@ -231,17 +280,28 @@ install_termux_deps() {
     print_substep "Installing base tools (nodejs-lts, git, openssh, build-essential, etc.)..."
     print_substep "This may take several minutes on first install..."
     
-    # Show real-time install progress with line limiting
-    local line_count=0
-    if ! pkg install -y nodejs-lts git openssh curl wget jq python golang rust build-essential mpv proot tailscale cloudflared 2>&1 | while read line; do
-        # Show progress lines but limit frequency to avoid clutter
-        if [[ "$line" =~ ^(Processing|Unpacking|Setting up|Reading|Building|Get:|Hit:|Ign:|^[a-z0-9\-]+:) ]]; then
-            print_substep "   $line"
+    # Install with retries for reliability
+    local install_attempt=1
+    while [[ $install_attempt -le 2 ]]; do
+        if ! pkg install -y --fix-broken nodejs-lts git openssh curl wget jq python golang rust build-essential mpv proot tailscale cloudflared 2>&1 | while read line; do
+            # Show progress lines but limit frequency to avoid clutter
+            if [[ "$line" =~ ^(Processing|Unpacking|Setting up|Reading|Building|Get:|Hit:|Ign:|^[a-z0-9\-]+:) ]]; then
+                print_substep "   $line"
+            fi
+        done; then
+            if [[ $install_attempt -lt 2 ]]; then
+                print_warn "Installation failed, retrying (attempt $((install_attempt + 1))/2)..."
+                pkill -f "apt|pkg" 2>/dev/null || true
+                sleep 3
+                install_attempt=$((install_attempt + 1))
+            else
+                print_error "Base tools installation failed after 2 attempts"
+                exit 1
+            fi
+        else
+            break
         fi
-    done; then
-        print_error "Base tools installation failed"
-        exit 1
-    fi
+    done
     print_success "nodejs-lts, git, curl, jq, and other tools"
     
     if ! check_command pnpm; then
