@@ -646,12 +646,50 @@ build_project() {
         
         print_substep "   Running tsdown (main build)..."
         if ! $TSDOWN_CMD > "$BUILD_LOG" 2>&1; then
-            stop_spinner "false" "tsdown failed"
-            echo ""
-            echo -e "${RED}━━━━━━━━━━━━━ ERROR LOG ━━━━━━━━━━━━━${NC}"
-            tail -n 30 "$BUILD_LOG" 2>/dev/null || cat "$BUILD_LOG" 2>/dev/null
-            echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            exit 1
+            # Check if it's a SIGILL / rolldown CPU incompatibility
+            if grep -q "Illegal instruction\|SIGILL\|rolldown" "$BUILD_LOG" 2>/dev/null; then
+                stop_spinner "false" "tsdown/rolldown CPU incompatible (SIGILL)"
+                print_substep "   Downloading pre-built dist/ from npm instead..."
+                start_spinner "Fetching pre-built dist/ (no local compilation)..."
+                
+                local PKG_NAME
+                PKG_NAME=$(node -e "process.stdout.write(require('./package.json').name)" 2>/dev/null || echo "openclaw-android")
+                local PKG_VERSION
+                PKG_VERSION=$(node -e "process.stdout.write(require('./package.json').version)" 2>/dev/null || echo "latest")
+                local TMP_PACK
+                TMP_PACK=$(mktemp -d)
+                
+                if (cd "$TMP_PACK" && npm pack "${PKG_NAME}@${PKG_VERSION}" --ignore-scripts > /dev/null 2>&1) || \
+                   (cd "$TMP_PACK" && npm pack "${PKG_NAME}" --ignore-scripts > /dev/null 2>&1); then
+                    local TARBALL
+                    TARBALL=$(ls "$TMP_PACK"/*.tgz 2>/dev/null | head -1)
+                    if [[ -n "$TARBALL" ]] && tar -xzf "$TARBALL" -C "$TMP_PACK" 2>/dev/null && [[ -d "$TMP_PACK/package/dist" ]]; then
+                        rm -rf "$PROJECT_ROOT/dist"
+                        cp -r "$TMP_PACK/package/dist" "$PROJECT_ROOT/dist"
+                        stop_spinner "true" "Pre-built dist/ fetched from npm"
+                        rm -rf "$TMP_PACK"
+                    else
+                        stop_spinner "false" "npm pack tarball missing dist/"
+                        rm -rf "$TMP_PACK"
+                        exit 1
+                    fi
+                else
+                    stop_spinner "false" "npm pack failed (network error?)"
+                    rm -rf "$TMP_PACK"
+                    echo ""
+                    echo -e "${YELLOW}This CPU cannot run rolldown, and pre-built download also failed.${NC}"
+                    echo -e "${YELLOW}Please check your network connection and retry.${NC}"
+                    echo ""
+                    exit 1
+                fi
+            else
+                stop_spinner "false" "tsdown failed"
+                echo ""
+                echo -e "${RED}━━━━━━━━━━━━━ ERROR LOG ━━━━━━━━━━━━━${NC}"
+                tail -n 30 "$BUILD_LOG" 2>/dev/null || cat "$BUILD_LOG" 2>/dev/null
+                echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+                exit 1
+            fi
         fi
         
         print_substep "   Compiling TypeScript declaration files..."

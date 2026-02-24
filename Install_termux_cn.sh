@@ -600,40 +600,50 @@ build_project() {
         if ! pnpm build > "$BUILD_LOG" 2>&1; then
             # 检查是否是 rolldown/canvas:a2ui:bundle 失败（CPU 指令不兼容）
             if grep -q "Illegal instruction" "$BUILD_LOG" 2>/dev/null || grep -q "rolldown" "$BUILD_LOG" 2>/dev/null; then
-                print_warn "   检测到 rolldown CPU 指令不兼容 (Illegal instruction 错误)"
-                print_warn "   尝试跳过 a2ui bundling，使用加速构建..."
-                stop_spinner "false" "标准构建失败，尝试替代方案"
+                # rolldown 依赖 CPU 指令集（Rust 编译）无法在此设备运行
+                # 直接从 npm 下载已发布的预构建 dist/
+                stop_spinner "false" "本地编译不可用 (rolldown CPU 不兼容)"
+                print_substep "   从 npm 下载预构建版本..."
+                start_spinner "下载预构建 dist/ (无需编译)..."
                 
-                # 清理之前的失败
-                rm -f .build.log
+                local PKG_NAME
+                PKG_NAME=$(node -e "process.stdout.write(require('./package.json').name)" 2>/dev/null || echo "openclaw-android")
+                local PKG_VERSION
+                PKG_VERSION=$(node -e "process.stdout.write(require('./package.json').version)" 2>/dev/null || echo "latest")
+                local TMP_PACK
+                TMP_PACK=$(mktemp -d)
                 
-                # 加速构建：直接运行 tsdown 和关键脚本，跳过 canvas:a2ui:bundle
-                print_substep "   运行 tsdown (跳过 a2ui bundling)..."
-                start_spinner "编译 TypeScript (加速模式)..."
-                
-                if ! (pnpm exec tsdown > "$BUILD_LOG" 2>&1 && \
-                      pnpm exec tsc -p tsconfig.plugin-sdk.dts.json >> "$BUILD_LOG" 2>&1 && \
-                      node --import tsx scripts/write-plugin-sdk-entry-dts.ts >> "$BUILD_LOG" 2>&1 && \
-                      node --import tsx scripts/copy-hook-metadata.ts >> "$BUILD_LOG" 2>&1 && \
-                      node --import tsx scripts/write-build-info.ts >> "$BUILD_LOG" 2>&1 && \
-                      node --import tsx scripts/write-cli-compat.ts >> "$BUILD_LOG" 2>&1); then
-                    stop_spinner "false" "加速构建也失败"
+                # 用 npm pack 拉取 tarball（不触发任何本地编译）
+                if (cd "$TMP_PACK" && npm pack "${PKG_NAME}@${PKG_VERSION}" --ignore-scripts > /dev/null 2>&1) || \
+                   (cd "$TMP_PACK" && npm pack "${PKG_NAME}" --ignore-scripts > /dev/null 2>&1); then
+                    local TARBALL
+                    TARBALL=$(ls "$TMP_PACK"/*.tgz 2>/dev/null | head -1)
+                    if [[ -n "$TARBALL" ]]; then
+                        tar -xzf "$TARBALL" -C "$TMP_PACK" 2>/dev/null
+                        if [[ -d "$TMP_PACK/package/dist" ]]; then
+                            rm -rf "$PROJECT_ROOT/dist"
+                            cp -r "$TMP_PACK/package/dist" "$PROJECT_ROOT/dist"
+                            stop_spinner "true" "已获取预构建 dist/ (来自 npm)"
+                            rm -rf "$TMP_PACK"
+                        else
+                            stop_spinner "false" "npm 包中未找到 dist/"
+                            rm -rf "$TMP_PACK"
+                            exit 1
+                        fi
+                    else
+                        stop_spinner "false" "npm pack 未生成 tarball"
+                        rm -rf "$TMP_PACK"
+                        exit 1
+                    fi
+                else
+                    stop_spinner "false" "npm pack 失败 (网络错误?)"
+                    rm -rf "$TMP_PACK"
                     echo ""
-                    echo -e "${RED}━━━━━━━━━━━━━ 构建失败详情 ━━━━━━━━━━━━━${NC}"
-                    tail -n 40 "$BUILD_LOG" 2>/dev/null || cat "$BUILD_LOG" 2>/dev/null
-                    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                    echo ""
-                    echo -e "${YELLOW}问题: Termux 上 rolldown 与 CPU 指令集不兼容${NC}"
-                    echo -e "${YELLOW}解决方案 1: 在低端设备上运行加速安装:${NC}"
-                    echo -e "${YELLOW}  export NO_CANVAS_BUILD=1${NC}"
-                    echo -e "${YELLOW}  ./Install_termux_cn.sh --full${NC}"
-                    echo -e "${YELLOW}解决方案 2: 更新您的 Termux 软件包:${NC}"
-                    echo -e "${YELLOW}  pkg upgrade${NC}"
-                    echo -e "${YELLOW}  termux-change-repo  # 选择快速镜像${NC}"
+                    echo -e "${YELLOW}此设备 CPU 不支持 rolldown，且无法下载预构建版本${NC}"
+                    echo -e "${YELLOW}请检查网络连接后重试${NC}"
                     echo ""
                     exit 1
                 fi
-                stop_spinner "true" "加速构建成功 (跳过 a2ui)"
             else
                 # 其他构建错误
                 stop_spinner "false" "pnpm build 失败"
