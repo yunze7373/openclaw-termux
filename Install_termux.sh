@@ -506,13 +506,25 @@ const external = ["@napi-rs/canvas", "@napi-rs/canvas-android-arm64"];
 build_project() {
     cd "$PROJECT_ROOT"
     
-    # Create temp log file for error capture
-    local BUILD_LOG="$PROJECT_ROOT/.build.log"
-    
     if [[ "$PLATFORM" == "termux" ]]; then
+        # Fix possible dpkg interrupt issues
+        print_substep "Fixing dpkg configuration..."
+        if dpkg_status=$(dpkg --configure -a 2>&1); then
+            if [[ "$dpkg_status" =~ "Setting up" ]]; then
+                print_success "dpkg configuration fixed"
+            fi
+        else
+            print_warn "dpkg --configure returned error, continuing anyway..."
+        fi
+        sleep 1
+        
         export npm_config_sharp_binary_host="https://npmmirror.com/mirrors/sharp-libvips"
         export npm_config_sharp_libvips_binary_host="https://npmmirror.com/mirrors/sharp-libvips"
         git config core.hooksPath /dev/null 2>/dev/null || true
+    fi
+    
+    # Create temp log file for error capture
+    local BUILD_LOG="$PROJECT_ROOT/.build.log"
     fi
     
     # npm dependencies with spinner (capture errors to log file)

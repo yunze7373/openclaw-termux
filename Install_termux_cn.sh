@@ -490,6 +490,17 @@ build_project() {
     cd "$PROJECT_ROOT"
     
     if [[ "$PLATFORM" == "termux" ]]; then
+        # 修复可能的 dpkg 中断问题
+        print_substep "修复 dpkg 配置..."
+        if dpkg_status=$(dpkg --configure -a 2>&1); then
+            if [[ "$dpkg_status" =~ "Setting up" ]]; then
+                print_success "dpkg 配置已修复"
+            fi
+        else
+            print_warn "dpkg --configure 返回错误，但继续进行..."
+        fi
+        sleep 1
+        
         export npm_config_sharp_binary_host="https://npmmirror.com/mirrors/sharp-libvips"
         export npm_config_sharp_libvips_binary_host="https://npmmirror.com/mirrors/sharp-libvips"
         git config core.hooksPath /dev/null 2>/dev/null || true
@@ -568,23 +579,62 @@ build_project() {
     print_substep "启动 TypeScript 编译..."
     start_spinner "编译 TypeScript (这可能需要 1-2 分钟)..."
     if [[ "$PLATFORM" == "termux" ]]; then
-        # Termux: 分解步骤进行编译
+        # Termux: 尝试标准构建，如果失败则使用加速编译
         print_substep "   运行 pnpm build (主要构建)..."
         if ! pnpm build > "$BUILD_LOG" 2>&1; then
-            stop_spinner "false" "pnpm build 失败"
-            echo ""
-            echo -e "${RED}━━━━━━━━━━━━━ 错误日志 ━━━━━━━━━━━━━${NC}"
-            tail -n 30 "$BUILD_LOG" 2>/dev/null || cat "$BUILD_LOG" 2>/dev/null
-            echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            exit 1
-        fi
-        
-        print_substep "   修复 Termux 兼容性问题..."
-        if ! (pnpm exec tsc 2>&1 | tee -a "$BUILD_LOG" && \
-              pnpm exec tsc -p tsconfig.plugin-sdk.dts.json >> "$BUILD_LOG" 2>&1 && \
-              node --import tsx scripts/write-build-info.ts >> "$BUILD_LOG" 2>&1); then
-            # 继续进行，即使有警告
-            print_substep "   编译有部分警告但继续进行..."
+            # 检查是否是 rolldown/canvas:a2ui:bundle 失败（CPU 指令不兼容）
+            if grep -q "Illegal instruction" "$BUILD_LOG" 2>/dev/null || grep -q "rolldown" "$BUILD_LOG" 2>/dev/null; then
+                print_warn "   检测到 rolldown CPU 指令不兼容 (Illegal instruction 错误)"
+                print_warn "   尝试跳过 a2ui bundling，使用加速构建..."
+                stop_spinner "false" "标准构建失败，尝试替代方案"
+                
+                # 清理之前的失败
+                rm -f .build.log
+                
+                # 加速构建：直接运行 tsdown 和关键脚本，跳过 canvas:a2ui:bundle
+                print_substep "   运行 tsdown (跳过 a2ui bundling)..."
+                start_spinner "编译 TypeScript (加速模式)..."
+                
+                if ! (pnpm exec tsdown > "$BUILD_LOG" 2>&1 && \
+                      pnpm exec tsc -p tsconfig.plugin-sdk.dts.json >> "$BUILD_LOG" 2>&1 && \
+                      node --import tsx scripts/write-plugin-sdk-entry-dts.ts >> "$BUILD_LOG" 2>&1 && \
+                      node --import tsx scripts/copy-hook-metadata.ts >> "$BUILD_LOG" 2>&1 && \
+                      node --import tsx scripts/write-build-info.ts >> "$BUILD_LOG" 2>&1 && \
+                      node --import tsx scripts/write-cli-compat.ts >> "$BUILD_LOG" 2>&1); then
+                    stop_spinner "false" "加速构建也失败"
+                    echo ""
+                    echo -e "${RED}━━━━━━━━━━━━━ 构建失败详情 ━━━━━━━━━━━━━${NC}"
+                    tail -n 40 "$BUILD_LOG" 2>/dev/null || cat "$BUILD_LOG" 2>/dev/null
+                    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+                    echo ""
+                    echo -e "${YELLOW}问题: Termux 上 rolldown 与 CPU 指令集不兼容${NC}"
+                    echo -e "${YELLOW}解决方案 1: 在低端设备上运行加速安装:${NC}"
+                    echo -e "${YELLOW}  export NO_CANVAS_BUILD=1${NC}"
+                    echo -e "${YELLOW}  ./Install_termux_cn.sh --full${NC}"
+                    echo -e "${YELLOW}解决方案 2: 更新您的 Termux 软件包:${NC}"
+                    echo -e "${YELLOW}  pkg upgrade${NC}"
+                    echo -e "${YELLOW}  termux-change-repo  # 选择快速镜像${NC}"
+                    echo ""
+                    exit 1
+                fi
+                stop_spinner "true" "加速构建成功 (跳过 a2ui)"
+            else
+                # 其他构建错误
+                stop_spinner "false" "pnpm build 失败"
+                echo ""
+                echo -e "${RED}━━━━━━━━━━━━━ 错误日志 ━━━━━━━━━━━━━${NC}"
+                tail -n 40 "$BUILD_LOG" 2>/dev/null || cat "$BUILD_LOG" 2>/dev/null
+                echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+                exit 1
+            fi
+        else
+            print_substep "   修复 Termux 兼容性问题..."
+            if ! (pnpm exec tsc 2>&1 | tee -a "$BUILD_LOG" && \
+                  pnpm exec tsc -p tsconfig.plugin-sdk.dts.json >> "$BUILD_LOG" 2>&1 && \
+                  node --import tsx scripts/write-build-info.ts >> "$BUILD_LOG" 2>&1); then
+                # 继续进行，即使有警告
+                print_substep "   编译有部分警告但继续进行..."
+            fi
         fi
         
         stop_spinner "true" "TypeScript 编译完成"
