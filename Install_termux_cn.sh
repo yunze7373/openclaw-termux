@@ -187,18 +187,30 @@ check_command() {
 install_termux_deps() {
     print_substep "检查系统包更新..."
     local UPGRADABLE
-    UPGRADABLE=$(pkg update -y 2>&1 | grep -c "can be upgraded" 2>/dev/null || true)
-    UPGRADABLE=${UPGRADABLE:-0}
-    UPGRADABLE=${UPGRADABLE//[^0-9]/}  # 移除非数字字符
-    if [[ -z "$UPGRADABLE" ]] || [[ "$UPGRADABLE" -eq 0 ]]; then
-        UPGRADABLE=0
-    fi
+    # 等待可能正在运行的其他pkg命令完成
+    print_substep "等待包管理器就绪..."
+    local wait_time=0
+    local max_wait=300  # 最多等待5分钟
+    while lsof /data/data/com.termux/files/usr/var/lib/dpkg/lock-frontend &>/dev/null 2>&1; do
+        if [[ $wait_time -gt $max_wait ]]; then
+            print_warn "包管理器被锁定，尝试强制释放..."
+            pkill -9 apt &>/dev/null || true
+            sleep 2
+            break
+        fi
+        sleep 2
+        wait_time=$((wait_time + 2))
+    done
+    
+    print_substep "更新包列表..."
+    pkg update -y 2>&1 | tail -3
+    
+    UPGRADABLE=$(apt list --upgradable 2>/dev/null | wc -l || echo 0)
+    UPGRADABLE=$((UPGRADABLE - 1))  # 减去表头行
     if [[ "$UPGRADABLE" -gt 0 ]]; then
         print_warn "检测到 $UPGRADABLE 个可升级的包，正在升级..."
-        pkg upgrade -y > /dev/null 2>&1 || {
-            print_error "系统包升级失败"
-            exit 1
-        }
+        print_substep "这可能需要几分钟，请耐心等待..."
+        pkg upgrade -y 2>&1 | tail -5
         print_success "系统包已升级"
     else
         print_success "系统包已是最新"
