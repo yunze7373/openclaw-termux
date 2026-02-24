@@ -787,6 +787,7 @@ main() {
             print_step "拉取最新代码"
             cd "$PROJECT_ROOT"
             git fetch origin > /dev/null 2>&1
+            git checkout main > /dev/null 2>&1
             git reset --hard origin/main > /dev/null 2>&1
             print_success "代码已更新"
             
