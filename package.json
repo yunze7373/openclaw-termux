@@ -1,5 +1,5 @@
 {
-  "name": "openclaw",
+  "name": "openclaw-termux",
   "version": "2026.2.22-termux.1",
   "description": "OpenClaw Termux Fork - Personal AI assistant for Android",
   "keywords": [],
@@ -12,6 +12,10 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yunze7373/openclaw-termux.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   },
   "bin": {
     "openclaw": "openclaw.mjs"
