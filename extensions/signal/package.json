@@ -5,7 +5,7 @@
   "description": "OpenClaw Signal channel plugin",
   "type": "module",
   "devDependencies": {
-    "openclaw": "workspace:*"
+    "openclaw-android": "workspace:*"
   },
   "openclaw": {
     "extensions": [
@@ -13,3 +13,4 @@
     ]
   }
 }
+

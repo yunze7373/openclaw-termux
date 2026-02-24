@@ -8,7 +8,7 @@
     "express": "^5.2.1"
   },
   "devDependencies": {
-    "openclaw": "workspace:*"
+    "openclaw-android": "workspace:*"
   },
   "openclaw": {
     "extensions": [
@@ -33,3 +33,4 @@
     }
   }
 }
+

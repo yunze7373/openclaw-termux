@@ -79,7 +79,14 @@
 
 ## 快速开始
 
-### 一键安装
+### 方案 1: npm 全局安装（最简单）
+
+```bash
+npm install -g openclaw-android
+openclaw onboard
+```
+
+### 方案 2: 一键安装脚本
 
 需要安装 **Termux** (建议 F-Droid 版本)。
 

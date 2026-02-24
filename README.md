@@ -91,7 +91,14 @@ When you have multiple idle phones, OpenClaw can form a **Local Distributed Clus
 
 Runtime: **Node ≥22** (installed automatically by deploy script).
 
-### One-Click Deploy (English)
+### Option 1: Install via npm (Easiest)
+
+```bash
+npm install -g openclaw-android
+openclaw onboard
+```
+
+### Option 2: One-Click Deploy (English)
 
 ```bash
 # Clone and run

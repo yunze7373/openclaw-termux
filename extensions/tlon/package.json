@@ -7,7 +7,7 @@
     "@urbit/aura": "^3.0.0"
   },
   "devDependencies": {
-    "openclaw": "workspace:*"
+    "openclaw-android": "workspace:*"
   },
   "openclaw": {
     "extensions": [
@@ -30,3 +30,4 @@
     }
   }
 }
+
