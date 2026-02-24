@@ -535,6 +535,8 @@ build_project() {
     set +e
     
     if [[ "$PLATFORM" == "termux" ]]; then
+        # Skip native builds on Termux to avoid compilation errors
+        print_substep "Skipping native builds with --ignore-scripts..."
         pnpm install --no-frozen-lockfile --ignore-scripts < /dev/null 2>&1 | tee "$BUILD_LOG" | grep -E "(ERR!|WARN|added|removed|moved)" | while read line; do
             # Optionally show warnings/errors in real-time
             if [[ "$line" =~ ERR! ]] || [[ "$line" =~ WARN ]]; then
