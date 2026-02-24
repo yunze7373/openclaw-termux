@@ -490,14 +490,28 @@ build_project() {
     cd "$PROJECT_ROOT"
     
     if [[ "$PLATFORM" == "termux" ]]; then
-        # 修复可能的 dpkg 中断问题
-        print_substep "修复 dpkg 配置..."
-        if dpkg_status=$(dpkg --configure -a 2>&1); then
-            if [[ "$dpkg_status" =~ "Setting up" ]]; then
-                print_success "dpkg 配置已修复"
+        # 修复可能的 dpkg 中断问题（带超时防止无限卡住）
+        print_substep "检查 dpkg 锁定状态..."
+        
+        # 如果 dpkg 锁被持有，等待片刻
+        local dpkg_wait_count=0
+        local max_dpkg_wait=10  # 最多等待10秒
+        
+        while [[ $dpkg_wait_count -lt $max_dpkg_wait ]]; do
+            if ! flock -n 9 <> /data/data/com.termux/files/usr/var/lib/dpkg/lock-frontend 2>/dev/null; then
+                # 锁被持有，等待
+                sleep 1
+                dpkg_wait_count=$((dpkg_wait_count + 1))
+            else
+                break
             fi
+        done
+        
+        # 尝试配置 dpkg，但不阻塞超过5秒
+        if timeout 5 dpkg --configure -a > /dev/null 2>&1; then
+            print_success "dpkg 配置已检查"
         else
-            print_warn "dpkg --configure 返回错误，但继续进行..."
+            print_warn "dpkg 锁定或配置超时，跳过 (已在依赖安装时处理)"
         fi
         sleep 1
         
@@ -516,6 +530,8 @@ build_project() {
     set +e
     
     if [[ "$PLATFORM" == "termux" ]]; then
+        # Skip native builds on Termux to avoid compilation errors
+        print_substep "使用 --ignore-scripts 跳过原生依赖编译..."
         pnpm install --no-frozen-lockfile --ignore-scripts < /dev/null 2>&1 | tee "$BUILD_LOG" | grep -E "(ERR!|WARN|added|removed|moved)" | while read line; do
             # 可选：实时显示警告/错误
             if [[ "$line" =~ ERR! ]] || [[ "$line" =~ WARN ]]; then
