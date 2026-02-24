@@ -8,8 +8,18 @@ import type {
 } from "playwright-core";
 
 // Termux/Android doesn't support playwright-core
-// Conditionally import chromium, stub if unavailable
-const isTermuxAndroid = process.platform === "android" || Boolean(process.env.TERMUX_VERSION);
+// Detection: process.platform is "linux" on Android (not "android"), so we need multiple checks:
+// - TERMUX_VERSION: set in shell sessions (may be absent in pm2 child processes)
+// - ANDROID_ROOT: set by Android OS system-wide, available in pm2 child processes
+// - ANDROID_DATA: similar to above
+// - Filesystem: /data/data/com.termux exists on Termux
+import { existsSync } from "node:fs";
+const isTermuxAndroid =
+  Boolean(process.env.TERMUX_VERSION) ||
+  Boolean(process.env.TERMUX) ||
+  Boolean(process.env.ANDROID_ROOT) ||
+  Boolean(process.env.ANDROID_DATA) ||
+  existsSync("/data/data/com.termux");
 let chromium: any = null;
 if (!isTermuxAndroid) {
   try {

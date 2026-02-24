@@ -860,6 +860,10 @@ setup_service() {
     if [[ "$PLATFORM" == "termux" ]]; then
         if check_command pm2; then
             pm2 delete openclaw-gateway > /dev/null 2>&1 || true
+            # Export env vars so pm2 child process inherits them for Termux detection
+            export TERMUX=1
+            export TERMUX_VERSION="${TERMUX_VERSION:-termux}"
+            export ANDROID_ROOT="${ANDROID_ROOT:-/system}"
             pm2 start "$OPENCLAW_BIN" --name openclaw-gateway --interpreter node -- gateway start > /dev/null 2>&1
             pm2 save > /dev/null 2>&1
             print_success "PM2 service configured"

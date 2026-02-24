@@ -768,6 +768,10 @@ setup_service() {
             # Termux: 直接启动 Node.js 脚本，确保参数正确传递
             # 使用 openclaw.mjs 而不是链接的 OPENCLAW_BIN，以确保 PM2 正确处理参数
             # 重要：使用 'gateway run' 而不是 'gateway start'（start是PM2管理命令，不会实际执行服务）
+            # Export env vars so pm2 child process inherits them for Termux detection
+            export TERMUX=1
+            export TERMUX_VERSION="${TERMUX_VERSION:-termux}"
+            export ANDROID_ROOT="${ANDROID_ROOT:-/system}"
             pm2 start node \
                 --name openclaw-gateway \
                 --cwd "$PROJECT_ROOT" \
