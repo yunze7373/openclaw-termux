@@ -216,6 +216,45 @@ ls Install_termux.sh Install_termux_cn.sh ANDROID_FIXES.md ANDROID_FIXES_CN.md R
 git checkout backup/pre-<NEW_VERSION> -- <缺失文件路径>
 ```
 
+### 5.3 Workspace 包依赖一致性检查 ⚠️
+
+**关键问题：** 如果主包名改过（例如 `openclaw` → `openclaw-android`），务必检查所有 extensions 和 packages 中的 workspace 引用是否同步。
+
+// turbo
+```bash
+cd C:\Users\han\source\repos\yunze7373\openclaw-termux
+
+# 查看主包名
+node -e "console.log(require('./package.json').name)"
+
+# 检查 extensions 中的引用
+grep -r '"openclaw' extensions/*/package.json | head -10
+
+# 检查 packages 中的引用
+grep -r '"openclaw' packages/*/package.json
+```
+
+**预期结果：** 所有引用都应该与主包名一致。例如：
+- 如果主包是 `"openclaw"`，所有引用应该是 `"openclaw": "workspace:*"`
+- 如果主包是 `"openclaw-android"`，所有引用应该是 `"openclaw-android": "workspace:*"`
+
+**如有不匹配：**
+
+```bash
+# 批量替换（PowerShell 示例）
+$files = @(Get-ChildItem -Path extensions -Filter "package.json" -Recurse; Get-ChildItem -Path packages -Filter "package.json" -Recurse)
+foreach ($file in $files) {
+    $content = Get-Content $file.FullName -Raw
+    # 替换旧包名为新包名
+    $newContent = $content -replace '"openclaw":\s*"workspace:\*"', '"openclaw-android": "workspace:*"'
+    Set-Content -Path $file.FullName -Value $newContent
+}
+
+# 提交这个修复
+git add extensions/*/package.json packages/*/package.json
+git commit -m "fix(workspace): sync package name references to <ACTUAL_PACKAGE_NAME>"
+```
+
 ---
 
 ## Step 6: 提交所有变更
