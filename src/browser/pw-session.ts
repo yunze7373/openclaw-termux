@@ -1,12 +1,3 @@
-import type {
-  Browser,
-  BrowserContext,
-  ConsoleMessage,
-  Page,
-  Request,
-  Response,
-} from "playwright-core";
-
 // Termux/Android doesn't support playwright-core
 // Detection: process.platform is "linux" on Android (not "android"), so we need multiple checks:
 // - TERMUX_VERSION: set in shell sessions (may be absent in pm2 child processes)
@@ -14,21 +5,41 @@ import type {
 // - ANDROID_DATA: similar to above
 // - Filesystem: /data/data/com.termux exists on Termux
 import { existsSync } from "node:fs";
+
 const isTermuxAndroid =
   Boolean(process.env.TERMUX_VERSION) ||
   Boolean(process.env.TERMUX) ||
   Boolean(process.env.ANDROID_ROOT) ||
   Boolean(process.env.ANDROID_DATA) ||
   existsSync("/data/data/com.termux");
+
+// Load playwright types and chromium only on supported platforms
+// Type imports are used only for TypeScript static analysis, they won't be imported at runtime
+// We use eval() to prevent esbuild from statically analyzing these imports
 let chromium: any = null;
+
 if (!isTermuxAndroid) {
   try {
-    chromium = require("playwright-core").chromium;
+    // Prevent esbuild from statically resolving this import
+    // eslint-disable-next-line no-eval
+    const pw = eval('require("playwright-core")');
+    chromium = pw.chromium;
   } catch (e) {
     // playwright-core not available on this platform
-    console.warn("[pw-session] playwright-core not available (expected on Termux/Android)");
+    console.warn("[pw-session] playwright-core not available:", String(e).split("\n")[0]);
   }
 }
+
+// We use a workaround for TypeScript: instead of importing types directly from playwright-core
+// (which would cause esbuild to try loading it statically), we use a conditional require
+// that's wrapped in a way that esbuild won't touch it.
+// The actual type definitions will be inferred from the chromium object or declared inline.
+type Browser = any;
+type BrowserContext = any;
+type ConsoleMessage = any;
+type Page = any;
+type Request = any;
+type Response = any;
 import { formatErrorMessage } from "../infra/errors.js";
 import type { SsrFPolicy } from "../infra/net/ssrf.js";
 import { appendCdpPath, fetchJson, getHeadersWithAuth, withCdpSocket } from "./cdp.helpers.js";

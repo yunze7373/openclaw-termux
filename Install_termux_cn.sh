@@ -473,7 +473,6 @@ patch_termux_compat() {
             sed -i '/^const env = {/,/^};/ {
                 /^};/a\
 \
-// Exclude native bindings that cannot be bundled on Android\/Termux\
 const external = ["@napi-rs/canvas", "@napi-rs/canvas-android-arm64"];
             }' "$PROJECT_ROOT/tsdown.config.ts"
 
@@ -489,9 +488,8 @@ const external = ["@napi-rs/canvas", "@napi-rs/canvas-android-arm64"];
         if ! grep -q 'TERMUX_VERSION' "$PROJECT_ROOT/src/media/input-files.ts" 2>/dev/null; then
             sed -i '/async function loadCanvasModule/,/^}/ {
                 /async function loadCanvasModule/a\
-  // Skip canvas loading on Termux (Android) due to native binding incompatibility\
   if (process.env.TERMUX_VERSION || process.platform === "android") {\
-    throw new Error("Canvas module not available on Android\/Termux");\
+    throw new Error("Canvas module not available on Android/Termux");\
   }\
 
             }' "$PROJECT_ROOT/src/media/input-files.ts"
@@ -499,6 +497,42 @@ const external = ["@napi-rs/canvas", "@napi-rs/canvas-android-arm64"];
             PATCHED=$((PATCHED + 1))
         fi
     fi
+
+    # 补丁 3: 禁用 playwright-core 在 Termux 上（防止导入时的 SIGILL 崩溃）
+    # playwright-core 检查 process.platform === "android" 并抛出错误
+    # 我们直接替换真实包为 stub，让 require("playwright-core") 返回空对象而不是崩溃
+    if [[ -d "$PROJECT_ROOT/node_modules/playwright-core" ]]; then
+        # Backup the real playwright-core
+        mv "$PROJECT_ROOT/node_modules/playwright-core" "$PROJECT_ROOT/node_modules/playwright-core.disabled" 2>/dev/null || true
+    fi
+    
+    # Create stub at the standard location that Node will find
+    mkdir -p "$PROJECT_ROOT/node_modules/playwright-core"
+    cat > "$PROJECT_ROOT/node_modules/playwright-core/package.json" << 'STUB_EOF'
+{
+  "name": "playwright-core",
+  "version": "0.0.0-termux-stub",
+  "main": "index.js",
+  "description": "Stub for playwright-core on Termux/Android"
+}
+STUB_EOF
+    cat > "$PROJECT_ROOT/node_modules/playwright-core/index.js" << 'STUB_EOF'
+// Stub for playwright-core on Termux/Android
+// The real playwright-core fails with:
+// "Error: Unsupported platform: android" (at registry/index.js:486)
+// This stub allows the application to load without crashing,
+// while browser/web automation features gracefully report unavailability
+module.exports = {
+  chromium: null,
+  firefox: null,
+  webkit: null,
+  devices: {},
+  errors: {},
+  selectors: {},
+  _addSelectorsTag: () => {},
+};
+STUB_EOF
+    PATCHED=$((PATCHED + 1))
 
     if [[ $PATCHED -gt 0 ]]; then
         print_success "已应用 $PATCHED 个 Termux 兼容性补丁"
@@ -641,7 +675,7 @@ build_project() {
                 fi
                 
                 # esbuild 编译各入口点（--packages=external 保留 node_modules 引用）
-                local ESBUILD_FLAGS="--bundle --platform=node --format=esm --packages=external --define:process.env.NODE_ENV='\"production\"' --external:@napi-rs/canvas --external:@napi-rs/canvas-android-arm64"
+                local ESBUILD_FLAGS="--bundle --platform=node --format=esm --packages=external --define:process.env.NODE_ENV='\"production\"' --external:@napi-rs/canvas --external:@napi-rs/canvas-android-arm64 --external:playwright-core"
                 local ESBUILD_OK=true
                 
                 mkdir -p dist dist/infra dist/cli dist/plugin-sdk dist/hooks

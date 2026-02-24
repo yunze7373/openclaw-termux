@@ -517,6 +517,42 @@ const external = ["@napi-rs/canvas", "@napi-rs/canvas-android-arm64"];
         fi
     fi
 
+    # Patch 3: Disable playwright-core on Termux to prevent crash from "Unsupported platform: android"
+    # playwright-core checks process.platform and throws error at registry/index.js:486
+    # We replace the real package with a stub, so require("playwright-core") returns empty object instead of crashing
+    if [[ -d "$PROJECT_ROOT/node_modules/playwright-core" ]]; then
+        # Backup the real playwright-core
+        mv "$PROJECT_ROOT/node_modules/playwright-core" "$PROJECT_ROOT/node_modules/playwright-core.disabled" 2>/dev/null || true
+    fi
+    
+    # Create stub at the standard location that Node will find
+    mkdir -p "$PROJECT_ROOT/node_modules/playwright-core"
+    cat > "$PROJECT_ROOT/node_modules/playwright-core/package.json" << 'STUB_EOF'
+{
+  "name": "playwright-core",
+  "version": "0.0.0-termux-stub",
+  "main": "index.js",
+  "description": "Stub for playwright-core on Termux/Android"
+}
+STUB_EOF
+    cat > "$PROJECT_ROOT/node_modules/playwright-core/index.js" << 'STUB_EOF'
+// Stub for playwright-core on Termux/Android
+// The real playwright-core fails with:
+// "Error: Unsupported platform: android" (at registry/index.js:486)
+// This stub allows the application to load without crashing,
+// while browser/web automation features gracefully report unavailability
+module.exports = {
+  chromium: null,
+  firefox: null,
+  webkit: null,
+  devices: {},
+  errors: {},
+  selectors: {},
+  _addSelectorsTag: () => {},
+};
+STUB_EOF
+    PATCHED=$((PATCHED + 1))
+
     if [[ $PATCHED -gt 0 ]]; then
         print_success "Applied $PATCHED Termux compatibility patches"
     else
@@ -689,7 +725,7 @@ build_project() {
                 fi
                 
                 # Build all entry points without rolldown (--packages=external keeps node_modules refs)
-                local ESBUILD_FLAGS="--bundle --platform=node --format=esm --packages=external --define:process.env.NODE_ENV='\"production\"' --external:@napi-rs/canvas --external:@napi-rs/canvas-android-arm64"
+                local ESBUILD_FLAGS="--bundle --platform=node --format=esm --packages=external --define:process.env.NODE_ENV='\"production\"' --external:@napi-rs/canvas --external:@napi-rs/canvas-android-arm64 --external:playwright-core"
                 local ESBUILD_OK=true
                 
                 mkdir -p dist dist/infra dist/cli dist/plugin-sdk dist/hooks
