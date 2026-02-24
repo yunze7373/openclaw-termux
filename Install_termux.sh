@@ -315,10 +315,35 @@ install_termux_deps() {
     
     if ! check_command pm2; then
         print_substep "Installing pm2 globally..."
-        if ! npm install -g pm2 2>&1 | tail -3; then
-            print_error "pm2 installation failed"
-            exit 1
-        fi
+        # pm2 install with timeout protection and progress feedback
+        local pm2_attempt=0
+        while [[ $pm2_attempt -lt 2 ]]; do
+            # Show real-time progress without buffering
+            if timeout 120 npm install -g pm2 \
+                --registry https://registry.npmmirror.com \
+                --fetch-timeout 60000 \
+                --fetch-retry-mintimeout 10000 \
+                --fetch-retry-maxtimeout 60000 \
+                --fetch-retries 5 2>&1; then
+                break
+            else
+                local npm_exit=$?
+                if [[ $npm_exit -eq 124 ]]; then
+                    print_warn "pm2 installation timeout (120s), killing processes and retrying..."
+                    pkill -9 npm 2>/dev/null || true
+                    pkill -9 node 2>/dev/null || true
+                    sleep 3
+                elif [[ $pm2_attempt -lt 1 ]]; then
+                    print_warn "pm2 installation failed (exit code: $npm_exit), attempt $((pm2_attempt + 2))/2..."
+                    pkill -9 npm 2>/dev/null || true
+                    sleep 2
+                else
+                    print_error "pm2 global installation failed 2 times, please check your network connection"
+                    exit 1
+                fi
+            fi
+            pm2_attempt=$((pm2_attempt + 1))
+        done
     fi
     print_success "pm2"
 }

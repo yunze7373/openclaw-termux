@@ -298,10 +298,35 @@ install_termux_deps() {
     
     if ! check_command pm2; then
         print_substep "全局安装 pm2..."
-        if ! npm install -g pm2 2>&1 | tail -3; then
-            print_error "pm2 安装失败"
-            exit 1
-        fi
+        # pm2 安装带有超时保护和进度反馈
+        local pm2_attempt=0
+        while [[ $pm2_attempt -lt 2 ]]; do
+            # 显示实时进度，不缓冲输出
+            if timeout 120 npm install -g pm2 \
+                --registry https://registry.npmmirror.com \
+                --fetch-timeout 60000 \
+                --fetch-retry-mintimeout 10000 \
+                --fetch-retry-maxtimeout 60000 \
+                --fetch-retries 5 2>&1; then
+                break
+            else
+                local npm_exit=$?
+                if [[ $npm_exit -eq 124 ]]; then
+                    print_warn "pm2 安装超时 (120s)，清理进程并重试..."
+                    pkill -9 npm 2>/dev/null || true
+                    pkill -9 node 2>/dev/null || true
+                    sleep 3
+                elif [[ $pm2_attempt -lt 1 ]]; then
+                    print_warn "pm2 安装失败 (exit code: $npm_exit)，尝试 $((pm2_attempt + 2))/2..."
+                    pkill -9 npm 2>/dev/null || true
+                    sleep 2
+                else
+                    print_error "pm2 全局安装失败 2 次，请检查网络连接"
+                    exit 1
+                fi
+            fi
+            pm2_attempt=$((pm2_attempt + 1))
+        done
     fi
     print_success "pm2"
 }
@@ -986,7 +1011,9 @@ main() {
             create_cli_entries
             setup_service
             
-            print_step "验证安装"
+            # 验证安装（作为第 6 步的后续，不显示为独立步骤）
+            echo ""
+            print_substep "验证安装..."
             verify_installation
             
             print_footer
