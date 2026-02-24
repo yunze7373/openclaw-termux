@@ -6,7 +6,19 @@ import type {
   Request,
   Response,
 } from "playwright-core";
-import { chromium } from "playwright-core";
+
+// Termux/Android doesn't support playwright-core
+// Conditionally import chromium, stub if unavailable
+const isTermuxAndroid = process.platform === "android" || Boolean(process.env.TERMUX_VERSION);
+let chromium: any = null;
+if (!isTermuxAndroid) {
+  try {
+    chromium = require("playwright-core").chromium;
+  } catch (e) {
+    // playwright-core not available on this platform
+    console.warn("[pw-session] playwright-core not available (expected on Termux/Android)");
+  }
+}
 import { formatErrorMessage } from "../infra/errors.js";
 import type { SsrFPolicy } from "../infra/net/ssrf.js";
 import { appendCdpPath, fetchJson, getHeadersWithAuth, withCdpSocket } from "./cdp.helpers.js";
@@ -316,6 +328,17 @@ function observeBrowser(browser: Browser) {
 }
 
 async function connectBrowser(cdpUrl: string): Promise<ConnectedBrowser> {
+  // Playwright/Browser tools are not supported on Termux/Android
+  if (isTermuxAndroid) {
+    throw new Error(
+      "Browser tools are not supported on Android/Termux. " +
+      "If you need browser functionality, please use openclaw on a desktop/server platform."
+    );
+  }
+  if (!chromium) {
+    throw new Error("playwright-core is not available in this environment");
+  }
+  
   const normalized = normalizeCdpUrl(cdpUrl);
   if (cached?.cdpUrl === normalized) {
     return cached;
