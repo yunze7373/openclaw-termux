@@ -507,14 +507,28 @@ build_project() {
     cd "$PROJECT_ROOT"
     
     if [[ "$PLATFORM" == "termux" ]]; then
-        # Fix possible dpkg interrupt issues
-        print_substep "Fixing dpkg configuration..."
-        if dpkg_status=$(dpkg --configure -a 2>&1); then
-            if [[ "$dpkg_status" =~ "Setting up" ]]; then
-                print_success "dpkg configuration fixed"
+        # Fix possible dpkg interrupt issues (with timeout to prevent hanging)
+        print_substep "Checking dpkg lock status..."
+        
+        # If dpkg lock is held, wait a moment
+        local dpkg_wait_count=0
+        local max_dpkg_wait=10  # Wait max 10 seconds
+        
+        while [[ $dpkg_wait_count -lt $max_dpkg_wait ]]; do
+            if ! flock -n 9 <> /data/data/com.termux/files/usr/var/lib/dpkg/lock-frontend 2>/dev/null; then
+                # Lock is held, wait
+                sleep 1
+                dpkg_wait_count=$((dpkg_wait_count + 1))
+            else
+                break
             fi
+        done
+        
+        # Try to configure dpkg, but don't block longer than 5 seconds
+        if timeout 5 dpkg --configure -a > /dev/null 2>&1; then
+            print_success "dpkg configuration checked"
         else
-            print_warn "dpkg --configure returned error, continuing anyway..."
+            print_warn "dpkg lock or configure timeout, skipping (already handled during deps install)"
         fi
         sleep 1
         
