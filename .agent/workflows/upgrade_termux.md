@@ -391,16 +391,134 @@ del RELEASE_NOTES.md
 
 ---
 
-## Step 11: 通知用户
+## Step 11: 发布到 npm
+
+### 11.1 确保 npm 认证正确
+
+首先验证当前 npm 用户和凭证：
+
+```bash
+cd C:\Users\han\source\repos\yunze7373\openclaw-termux
+npm whoami
+```
+
+如果未认证或凭证过期，重新登录：
+
+```bash
+npm login
+# 按照提示输入用户名、密码、邮箱和 OTP
+```
+
+### 11.2 验证 package.json 正确
+
+// turbo
+确保 `package.json` 包含正确的 npm 发布配置：
+
+```bash
+cd C:\Users\han\source\repos\yunze7373\openclaw-termux
+node -e "const pkg = require('./package.json'); console.log('Name:', pkg.name, '\\nVersion:', pkg.version, '\\npublishConfig:', pkg.publishConfig)"
+```
+
+**预期输出示例：**
+```
+Name: openclaw-android
+Version: 2026.2.9
+publishConfig: { registry: 'https://registry.npmjs.org', access: 'public' }
+```
+
+### 11.3 发布到 npm
+
+⚠️ **重要：** 使用 `--ignore-scripts` 防止在发布时构建本地资源（因为 Termux 可能不需要）
+
+```bash
+cd C:\Users\han\source\repos\yunze7373\openclaw-termux
+npm publish --ignore-scripts --access public
+```
+
+### 11.4 验证 npm 发布
+
+发布成功后，验证包在 npm registry 上：
+
+```bash
+# 查看发布的版本
+npm view <PACKAGE_NAME> version
+
+# 查看完整包信息
+npm view <PACKAGE_NAME>
+
+# 示例
+npm view openclaw-android version
+npm view openclaw-android
+```
+
+**验证应包含：**
+- ✅ 版本号正确（例如 `2026.2.9`）
+- ✅ 包名正确（例如 `openclaw-android`）
+- ✅ 发布时间为当前
+- ✅ 文件数包括主要源文件和编译输出
+
+### 11.5 发布 npm 标签（可选）
+
+如果需要在 npm 上创建特殊标签（例如 beta）：
+
+```bash
+# 添加 latest 标签（默认）
+npm dist-tag add <PACKAGE_NAME>@<VERSION> latest
+
+# 添加 beta 标签
+npm dist-tag add <PACKAGE_NAME>@<VERSION> beta
+
+# 查看所有标签
+npm dist-tag ls <PACKAGE_NAME>
+```
+
+---
+
+## Step 12: 通知用户
 
 升级完成后，通知用户以下信息：
-1. Release 链接：`https://github.com/yunze7373/openclaw-termux/releases/tag/<NEW_VERSION>-termux.1`
-2. Termux 上更新方法：`./Install_termux_cn.sh --update`
-3. 备份分支名：`backup/pre-<NEW_VERSION>`
+
+1. **GitHub Release**: `https://github.com/yunze7373/openclaw-termux/releases/tag/<NEW_VERSION>-termux.1`
+2. **npm 包**: `npm install -g <PACKAGE_NAME>@<VERSION>` (例如 `npm install -g openclaw-android@2026.2.9`)
+3. **Termux 更新**: `./Install_termux_cn.sh --update`
+4. **备份分支**: `backup/pre-<NEW_VERSION>`
 
 ---
 
 ## 故障排除
+
+### npm 发布失败
+
+**错误：`403 Forbidden`**
+```bash
+# 通常是凭证过期或权限问题
+npm logout
+npm login
+npm publish --ignore-scripts --access public
+```
+
+**错误：`You cannot publish over the previously published versions`**
+- 这是 npm 的安全机制，实际上包已经发布了
+- 用 `npm view <PACKAGE_NAME> version` 验证版本已存在
+- 如果想发布不同版本，修改 `package.json` 中的 version 字段
+
+**错误：`npm ERR! code E404`**
+- 包名不存在或拼写错误
+- 检查 `package.json` 中的 `name` 字段
+- 检查 `publishConfig.name` 是否被正确覆盖
+
+### npm 发布后找不到包
+
+```bash
+# npm registry 可能有延迟（通常 1-2 分钟）
+# 多次尝试查看
+npm search <PACKAGE_NAME>
+
+# 或直接访问
+# https://www.npmjs.com/package/<PACKAGE_NAME>
+```
+
+### 合并失败
 
 ### 合并失败
 ```bash
