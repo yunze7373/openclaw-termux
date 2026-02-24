@@ -203,68 +203,120 @@ install_termux_deps() {
     done
     
     print_substep "更新包列表..."
-    pkg update -y 2>&1 | tail -3
+    if ! pkg update -y 2>&1 | tail -3; then
+        print_error "包列表更新失败"
+        exit 1
+    fi
     
     UPGRADABLE=$(apt list --upgradable 2>/dev/null | wc -l || echo 0)
     UPGRADABLE=$((UPGRADABLE - 1))  # 减去表头行
     if [[ "$UPGRADABLE" -gt 0 ]]; then
         print_warn "检测到 $UPGRADABLE 个可升级的包，正在升级..."
-        print_substep "这可能需要几分钟，请耐心等待..."
-        pkg upgrade -y 2>&1 | tail -5
+        print_substep "这可能需要几分钟时间，具体取决于包的大小..."
+        
+        # 显示实时升级进度
+        if ! pkg upgrade -y 2>&1 | grep -E "^(Processing|Unpacking|Setting up|^[^ ])" | while read line; do
+            print_substep "   $line"
+        done; then
+            print_error "系统包升级失败"
+            exit 1
+        fi
         print_success "系统包已升级"
     else
         print_success "系统包已是最新"
     fi
     
-    print_substep "安装基础工具..."
-    pkg install -y nodejs-lts git openssh curl wget jq > /dev/null 2>&1
-    print_success "nodejs-lts, git, curl, jq"
+    print_substep "安装基础工具 (nodejs-lts, git, openssh, build-essential 等)..."
+    print_substep "这可能需要几分钟时间，请耐心等待..."
+    
+    # 显示实时安装进度，限制频率以避免过度输出
+    if ! pkg install -y nodejs-lts git openssh curl wget jq python golang rust build-essential mpv proot tailscale cloudflared 2>&1 | while read line; do
+        # 显示进度行但限制频率
+        if [[ "$line" =~ ^(Processing|Unpacking|Setting up|Reading|Building|Get:|Hit:|Ign:|^[a-z0-9\-]+:) ]]; then
+            print_substep "   $line"
+        fi
+    done; then
+        print_error "基础工具安装失败"
+        exit 1
+    fi
+    print_success "nodejs-lts, git, curl, jq 及其他工具"
     
     if ! check_command pnpm; then
-        print_substep "安装 pnpm..."
-        npm install -g pnpm > /dev/null 2>&1
+        print_substep "全局安装 pnpm..."
+        if ! npm install -g pnpm 2>&1 | tail -3; then
+            print_error "pnpm 安装失败"
+            exit 1
+        fi
     fi
     print_success "pnpm"
     
     if ! check_command pm2; then
-        print_substep "安装 pm2..."
-        npm install -g pm2 > /dev/null 2>&1
+        print_substep "全局安装 pm2..."
+        if ! npm install -g pm2 2>&1 | tail -3; then
+            print_error "pm2 安装失败"
+            exit 1
+        fi
     fi
     print_success "pm2"
 }
 
 install_linux_deps() {
-    print_substep "安装 Linux 依赖..."
+    print_substep "检测包管理器并更新系统..."
     
     if check_command apt-get; then
-        sudo apt-get update > /dev/null 2>&1
-        sudo apt-get install -y nodejs npm git curl jq > /dev/null 2>&1
+        print_substep "   检测到 apt-get 包管理器..."
+        print_substep "   运行 apt-get update..."
+        if ! sudo apt-get update 2>&1 | tail -5; then
+            print_error "apt-get update 失败"
+            exit 1
+        fi
+        print_substep "   使用 apt-get 安装 (nodejs npm git curl jq)..."
+        if ! sudo apt-get install -y nodejs npm git curl jq 2>&1 | tail -5; then
+            print_error "apt-get 安装失败"
+            exit 1
+        fi
     elif check_command dnf; then
-        sudo dnf install -y nodejs npm git curl jq > /dev/null 2>&1
+        print_substep "   检测到 dnf 包管理器..."
+        print_substep "   使用 dnf 安装 (nodejs npm git curl jq)..."
+        if ! sudo dnf install -y nodejs npm git curl jq 2>&1 | tail -5; then
+            print_error "dnf 安装失败"
+            exit 1
+        fi
     elif check_command pacman; then
-        sudo pacman -Sy --noconfirm nodejs npm git curl jq > /dev/null 2>&1
+        print_substep "   检测到 pacman 包管理器..."
+        print_substep "   使用 pacman 安装 (nodejs npm git curl jq)..."
+        if ! sudo pacman -Sy --noconfirm nodejs npm git curl jq 2>&1 | tail -5; then
+            print_error "pacman 安装失败"
+            exit 1
+        fi
     else
         print_warn "无法检测包管理器，请手动安装: nodejs npm git curl jq"
     fi
     
     if ! check_command pnpm; then
-        npm install -g pnpm > /dev/null 2>&1
+        print_substep "全局安装 pnpm..."
+        npm install -g pnpm 2>&1 | tail -3
     fi
     print_success "依赖安装完成"
 }
 
 install_macos_deps() {
-    print_substep "安装 macOS 依赖..."
+    print_substep "通过 Homebrew 安装 macOS 依赖..."
     
     if ! check_command brew; then
         print_error "请先安装 Homebrew: https://brew.sh"
         exit 1
     fi
     
-    brew install node git jq > /dev/null 2>&1
+    print_substep "   使用 Homebrew 安装 (node git jq)..."
+    if ! brew install node git jq 2>&1 | tail -5; then
+        print_error "Homebrew 安装失败"
+        exit 1
+    fi
     
     if ! check_command pnpm; then
-        npm install -g pnpm > /dev/null 2>&1
+        print_substep "全局安装 pnpm..."
+        npm install -g pnpm 2>&1 | tail -3
     fi
     print_success "依赖安装完成"
 }
@@ -400,17 +452,26 @@ build_project() {
     local BUILD_LOG="$PROJECT_ROOT/.build.log"
     
     # npm 依赖安装（带旋转动画，捕获错误到日志）
-    start_spinner "安装 npm 依赖 (这可能需要 3-5 分钟)..."
+    print_substep "使用 pnpm 安装 npm 依赖..."
+    start_spinner "这可能需要 3-5 分钟，具体取决于平台..."
     
     # 暂时禁用 errexit 以便自行处理错误
     set +e
     
     if [[ "$PLATFORM" == "termux" ]]; then
-        pnpm install --no-frozen-lockfile --ignore-scripts < /dev/null > "$BUILD_LOG" 2>&1
+        pnpm install --no-frozen-lockfile --ignore-scripts < /dev/null 2>&1 | tee "$BUILD_LOG" | grep -E "(ERR!|WARN|added|removed|moved)" | while read line; do
+            # 可选：实时显示警告/错误
+            if [[ "$line" =~ ERR! ]] || [[ "$line" =~ WARN ]]; then
+                echo -e "   ${YELLOW}$line${NC}"
+            fi
+        done &
+        local pnpm_pid=$!
+        wait $pnpm_pid
         local pnpm_exit=$?
         
         if [[ $pnpm_exit -eq 0 ]]; then
             # 手动运行兼容的 postinstall 脚本
+            print_substep "运行 postinstall 脚本..."
             node node_modules/.pnpm/esbuild*/node_modules/esbuild/install.js 2>/dev/null || true
             stop_spinner "true" "npm 依赖安装完成"
             rm -f "$BUILD_LOG"
@@ -431,7 +492,11 @@ build_project() {
             exit 1
         fi
     else
-        pnpm install --frozen-lockfile > "$BUILD_LOG" 2>&1 || pnpm install > "$BUILD_LOG" 2>&1
+        print_substep "尝试标准锁定文件安装 (更快)..."
+        (pnpm install --frozen-lockfile 2>&1 | tee "$BUILD_LOG") || (
+            print_substep "标准锁定文件安装失败，尝试灵活安装..."
+            pnpm install 2>&1 | tee "$BUILD_LOG"
+        )
         local pnpm_exit=$?
         
         if [[ $pnpm_exit -eq 0 ]]; then
@@ -454,27 +519,33 @@ build_project() {
     fi
     
     # TypeScript 编译（带旋转动画）
+    print_substep "启动 TypeScript 编译..."
     start_spinner "编译 TypeScript (这可能需要 1-2 分钟)..."
     if [[ "$PLATFORM" == "termux" ]]; then
-        # Termux: 使用 pnpm build，忽略脚本错误，但不要失败
-        if pnpm build > "$BUILD_LOG" 2>&1 || \
-           (echo "warning: pnpm build 可能有问题，尝试恢复..." && \
-            pnpm exec tsc 2>&1 | tee -a "$BUILD_LOG" && \
-            pnpm exec tsc -p tsconfig.plugin-sdk.dts.json >> "$BUILD_LOG" 2>&1 && \
-            node --import tsx scripts/write-build-info.ts >> "$BUILD_LOG" 2>&1); then
-            stop_spinner "true" "TypeScript 编译完成"
-            rm -f "$BUILD_LOG"
-        else
-            stop_spinner "false" "TypeScript 编译警告 (继续进行)"
-            echo -e "${YELLOW}⚠ 编译可能有部分步骤失败，但继续进行...${NC}"
-            tail -n 10 "$BUILD_LOG" 2>/dev/null || true
-            rm -f "$BUILD_LOG"
+        # Termux: 分解步骤进行编译
+        print_substep "   运行 pnpm build (主要构建)..."
+        if ! pnpm build > "$BUILD_LOG" 2>&1; then
+            stop_spinner "false" "pnpm build 失败"
+            echo ""
+            echo -e "${RED}━━━━━━━━━━━━━ 错误日志 ━━━━━━━━━━━━━${NC}"
+            tail -n 30 "$BUILD_LOG" 2>/dev/null || cat "$BUILD_LOG" 2>/dev/null
+            echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            exit 1
         fi
+        
+        print_substep "   修复 Termux 兼容性问题..."
+        if ! (pnpm exec tsc 2>&1 | tee -a "$BUILD_LOG" && \
+              pnpm exec tsc -p tsconfig.plugin-sdk.dts.json >> "$BUILD_LOG" 2>&1 && \
+              node --import tsx scripts/write-build-info.ts >> "$BUILD_LOG" 2>&1); then
+            # 继续进行，即使有警告
+            print_substep "   编译有部分警告但继续进行..."
+        fi
+        
+        stop_spinner "true" "TypeScript 编译完成"
+        rm -f "$BUILD_LOG"
     else
-        if pnpm build > "$BUILD_LOG" 2>&1; then
-            stop_spinner "true" "TypeScript 编译完成"
-            rm -f "$BUILD_LOG"
-        else
+        print_substep "   运行 pnpm build..."
+        if ! pnpm build > "$BUILD_LOG" 2>&1; then
             stop_spinner "false" "构建失败"
             echo ""
             echo -e "${RED}━━━━━━━━━━━━━ 错误日志 ━━━━━━━━━━━━━${NC}"
@@ -484,9 +555,12 @@ build_project() {
             echo -e "${YELLOW}提示: 完整日志保存在: $BUILD_LOG${NC}"
             exit 1
         fi
+        stop_spinner "true" "TypeScript 编译完成"
+        rm -f "$BUILD_LOG"
     fi
     
     # UI 构建（带旋转动画）
+    print_substep "构建 UI 组件..."
     start_spinner "构建 UI..."
     if pnpm ui:build > "$BUILD_LOG" 2>&1; then
         stop_spinner "true" "UI 构建完成"

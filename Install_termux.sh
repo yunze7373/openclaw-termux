@@ -204,7 +204,9 @@ check_command() {
 install_termux_deps() {
     print_substep "Checking system package updates..."
     local UPGRADABLE
-    UPGRADABLE=$(pkg update -y 2>&1 | grep -c "can be upgraded" 2>/dev/null || true)
+    local UPDATE_OUTPUT
+    UPDATE_OUTPUT=$(pkg update -y 2>&1)
+    UPGRADABLE=$(echo "$UPDATE_OUTPUT" | grep -c "can be upgraded" 2>/dev/null || true)
     UPGRADABLE=${UPGRADABLE:-0}
     UPGRADABLE=${UPGRADABLE//[^0-9]/}  # Remove any non-numeric characters
     if [[ -z "$UPGRADABLE" ]] || [[ "$UPGRADABLE" -eq 0 ]]; then
@@ -212,64 +214,112 @@ install_termux_deps() {
     fi
     if [[ "$UPGRADABLE" -gt 0 ]]; then
         print_warn "Found $UPGRADABLE upgradable packages, upgrading..."
-        pkg upgrade -y > /dev/null 2>&1 || {
+        print_substep "This may take several minutes depending on package size..."
+        
+        # Show real-time upgrade progress
+        if ! pkg upgrade -y 2>&1 | grep -E "^(Processing|Unpacking|Setting up|^[^ ])" | while read line; do
+            print_substep "   $line"
+        done; then
             print_error "System package upgrade failed"
             exit 1
-        }
+        fi
         print_success "System packages upgraded"
     else
         print_success "System packages up to date"
     fi
     
-    print_substep "Installing base tools..."
-    pkg install -y nodejs-lts git openssh curl wget jq python golang rust build-essential mpv proot tailscale cloudflared > /dev/null 2>&1
-    print_success "nodejs-lts, git, curl, jq"
+    print_substep "Installing base tools (nodejs-lts, git, openssh, build-essential, etc.)..."
+    print_substep "This may take several minutes on first install..."
+    
+    # Show real-time install progress with line limiting
+    local line_count=0
+    if ! pkg install -y nodejs-lts git openssh curl wget jq python golang rust build-essential mpv proot tailscale cloudflared 2>&1 | while read line; do
+        # Show progress lines but limit frequency to avoid clutter
+        if [[ "$line" =~ ^(Processing|Unpacking|Setting up|Reading|Building|Get:|Hit:|Ign:|^[a-z0-9\-]+:) ]]; then
+            print_substep "   $line"
+        fi
+    done; then
+        print_error "Base tools installation failed"
+        exit 1
+    fi
+    print_success "nodejs-lts, git, curl, jq, and other tools"
     
     if ! check_command pnpm; then
-        print_substep "Installing pnpm..."
-        npm install -g pnpm > /dev/null 2>&1
+        print_substep "Installing pnpm globally..."
+        if ! npm install -g pnpm 2>&1 | tail -3; then
+            print_error "pnpm installation failed"
+            exit 1
+        fi
     fi
     print_success "pnpm"
     
     if ! check_command pm2; then
-        print_substep "Installing pm2..."
-        npm install -g pm2 > /dev/null 2>&1
+        print_substep "Installing pm2 globally..."
+        if ! npm install -g pm2 2>&1 | tail -3; then
+            print_error "pm2 installation failed"
+            exit 1
+        fi
     fi
     print_success "pm2"
 }
 
 install_linux_deps() {
-    print_substep "Installing Linux dependencies..."
+    print_substep "Detecting package manager and updating system..."
     
     if check_command apt-get; then
-        sudo apt-get update > /dev/null 2>&1
-        sudo apt-get install -y nodejs npm git curl jq > /dev/null 2>&1
+        print_substep "   Using apt-get package manager..."
+        print_substep "   Running apt-get update..."
+        if ! sudo apt-get update 2>&1 | tail -5; then
+            print_error "apt-get update failed"
+            exit 1
+        fi
+        print_substep "   Installing with apt-get (nodejs npm git curl jq)..."
+        if ! sudo apt-get install -y nodejs npm git curl jq 2>&1 | tail -5; then
+            print_error "apt-get install failed"
+            exit 1
+        fi
     elif check_command dnf; then
-        sudo dnf install -y nodejs npm git curl jq > /dev/null 2>&1
+        print_substep "   Using dnf package manager..."
+        print_substep "   Installing with dnf (nodejs npm git curl jq)..."
+        if ! sudo dnf install -y nodejs npm git curl jq 2>&1 | tail -5; then
+            print_error "dnf install failed"
+            exit 1
+        fi
     elif check_command pacman; then
-        sudo pacman -Sy --noconfirm nodejs npm git curl jq > /dev/null 2>&1
+        print_substep "   Using pacman package manager..."
+        print_substep "   Installing with pacman (nodejs npm git curl jq)..."
+        if ! sudo pacman -Sy --noconfirm nodejs npm git curl jq 2>&1 | tail -5; then
+            print_error "pacman install failed"
+            exit 1
+        fi
     else
         print_warn "Cannot detect package manager, please install manually: nodejs npm git curl jq"
     fi
     
     if ! check_command pnpm; then
-        npm install -g pnpm > /dev/null 2>&1
+        print_substep "Installing pnpm globally..."
+        npm install -g pnpm 2>&1 | tail -3
     fi
     print_success "Dependencies installed"
 }
 
 install_macos_deps() {
-    print_substep "Installing macOS dependencies..."
+    print_substep "Installing macOS dependencies via Homebrew..."
     
     if ! check_command brew; then
         print_error "Please install Homebrew first: https://brew.sh"
         exit 1
     fi
     
-    brew install node git jq > /dev/null 2>&1
+    print_substep "   Installing with Homebrew (node git jq)..."
+    if ! brew install node git jq 2>&1 | tail -5; then
+        print_error "Homebrew install failed"
+        exit 1
+    fi
     
     if ! check_command pnpm; then
-        npm install -g pnpm > /dev/null 2>&1
+        print_substep "Installing pnpm globally..."
+        npm install -g pnpm 2>&1 | tail -3
     fi
     print_success "Dependencies installed"
 }
@@ -406,17 +456,26 @@ build_project() {
     fi
     
     # npm dependencies with spinner (capture errors to log file)
-    start_spinner "Installing npm dependencies (this may take 3-5 minutes)..."
+    print_substep "Installing npm dependencies with pnpm..."
+    start_spinner "This may take 3-5 minutes depending on platform..."
     
     # Temporarily disable errexit to handle errors ourselves
     set +e
     
     if [[ "$PLATFORM" == "termux" ]]; then
-        pnpm install --no-frozen-lockfile --ignore-scripts < /dev/null > "$BUILD_LOG" 2>&1
+        pnpm install --no-frozen-lockfile --ignore-scripts < /dev/null 2>&1 | tee "$BUILD_LOG" | grep -E "(ERR!|WARN|added|removed|moved)" | while read line; do
+            # Optionally show warnings/errors in real-time
+            if [[ "$line" =~ ERR! ]] || [[ "$line" =~ WARN ]]; then
+                echo -e "   ${YELLOW}$line${NC}"
+            fi
+        done &
+        local pnpm_pid=$!
+        wait $pnpm_pid
         local pnpm_exit=$?
         
         if [[ $pnpm_exit -eq 0 ]]; then
             # Run compatible postinstall scripts
+            print_substep "Running postinstall scripts..."
             node node_modules/.pnpm/esbuild*/node_modules/esbuild/install.js 2>/dev/null || true
             stop_spinner "true" "npm dependencies installed"
             rm -f "$BUILD_LOG"
@@ -438,7 +497,11 @@ build_project() {
             exit 1
         fi
     else
-        pnpm install --frozen-lockfile > "$BUILD_LOG" 2>&1 || pnpm install > "$BUILD_LOG" 2>&1
+        print_substep "Trying frozen lockfile first (faster)..."
+        (pnpm install --frozen-lockfile 2>&1 | tee "$BUILD_LOG") || (
+            print_substep "Frozen lockfile failed, trying flexible install..."
+            pnpm install 2>&1 | tee "$BUILD_LOG"
+        )
         local pnpm_exit=$?
         
         if [[ $pnpm_exit -eq 0 ]]; then
@@ -462,6 +525,7 @@ build_project() {
     fi
     
     # TypeScript compilation with spinner
+    print_substep "Starting TypeScript compilation..."
     start_spinner "Compiling TypeScript (this may take 1-2 minutes)..."
     if [[ "$PLATFORM" == "termux" ]]; then
         # Resolve tsdown command: pnpm exec → global → direct node execution
@@ -472,6 +536,7 @@ build_project() {
             TSDOWN_CMD="tsdown"
         else
             # Auto-install global tsdown
+            print_substep "   Installing tsdown..."
             npm install -g tsdown > /dev/null 2>&1 || true
             if command -v tsdown &> /dev/null; then
                 TSDOWN_CMD="tsdown"
@@ -491,16 +556,58 @@ build_project() {
             exit 1
         fi
         
-        if $TSDOWN_CMD > "$BUILD_LOG" 2>&1 && \
-           pnpm exec tsc -p tsconfig.plugin-sdk.dts.json >> "$BUILD_LOG" 2>&1 && \
-           node --import tsx scripts/write-plugin-sdk-entry-dts.ts >> "$BUILD_LOG" 2>&1 && \
-           node --import tsx scripts/canvas-a2ui-copy.ts >> "$BUILD_LOG" 2>&1 && \
-           node --import tsx scripts/copy-hook-metadata.ts >> "$BUILD_LOG" 2>&1 && \
-           node --import tsx scripts/write-build-info.ts >> "$BUILD_LOG" 2>&1 && \
-           node --import tsx scripts/write-cli-compat.ts >> "$BUILD_LOG" 2>&1; then
-            stop_spinner "true" "TypeScript compilation complete"
-            rm -f "$BUILD_LOG"
-        else
+        print_substep "   Running tsdown (main build)..."
+        if ! $TSDOWN_CMD > "$BUILD_LOG" 2>&1; then
+            stop_spinner "false" "tsdown failed"
+            echo ""
+            echo -e "${RED}━━━━━━━━━━━━━ ERROR LOG ━━━━━━━━━━━━━${NC}"
+            tail -n 30 "$BUILD_LOG" 2>/dev/null || cat "$BUILD_LOG" 2>/dev/null
+            echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            exit 1
+        fi
+        
+        print_substep "   Compiling TypeScript declaration files..."
+        if ! pnpm exec tsc -p tsconfig.plugin-sdk.dts.json >> "$BUILD_LOG" 2>&1; then
+            stop_spinner "false" "tsc dts compilation failed"
+            exit 1
+        fi
+        
+        print_substep "   Generating plugin SDK..."
+        if ! node --import tsx scripts/write-plugin-sdk-entry-dts.ts >> "$BUILD_LOG" 2>&1; then
+            stop_spinner "false" "plugin SDK generation failed"
+            exit 1
+        fi
+        
+        print_substep "   Copying A2UI assets..."
+        if ! node --import tsx scripts/canvas-a2ui-copy.ts >> "$BUILD_LOG" 2>&1; then
+            stop_spinner "false" "A2UI copy failed"
+            exit 1
+        fi
+        
+        print_substep "   Copying hook metadata..."
+        if ! node --import tsx scripts/copy-hook-metadata.ts >> "$BUILD_LOG" 2>&1; then
+            stop_spinner "false" "hook metadata copy failed"
+            exit 1
+        fi
+        
+        print_substep "   Writing build info..."
+        if ! node --import tsx scripts/write-build-info.ts >> "$BUILD_LOG" 2>&1; then
+            stop_spinner "false" "build info generation failed"
+            exit 1
+        fi
+        
+        print_substep "   Writing CLI compatibility info..."
+        if ! node --import tsx scripts/write-cli-compat.ts >> "$BUILD_LOG" 2>&1; then
+            stop_spinner "false" "CLI compat generation failed"
+            exit 1
+        fi
+        
+        stop_spinner "true" "TypeScript compilation complete"
+        rm -f "$BUILD_LOG"
+    else
+        # Non-Termux platforms
+        print_substep "   Running pnpm build..."
+        if ! pnpm build > "$BUILD_LOG" 2>&1; then
             stop_spinner "false" "TypeScript compilation failed"
             echo ""
             echo -e "${RED}━━━━━━━━━━━━━ ERROR LOG ━━━━━━━━━━━━━${NC}"
@@ -510,23 +617,12 @@ build_project() {
             echo -e "${YELLOW}Tip: Full log saved at: $BUILD_LOG${NC}"
             exit 1
         fi
-    else
-        if pnpm build > "$BUILD_LOG" 2>&1; then
-            stop_spinner "true" "TypeScript compilation complete"
-            rm -f "$BUILD_LOG"
-        else
-            stop_spinner "false" "Build failed"
-            echo ""
-            echo -e "${RED}━━━━━━━━━━━━━ ERROR LOG ━━━━━━━━━━━━━${NC}"
-            tail -n 30 "$BUILD_LOG" 2>/dev/null || cat "$BUILD_LOG" 2>/dev/null
-            echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            echo ""
-            echo -e "${YELLOW}Tip: Full log saved at: $BUILD_LOG${NC}"
-            exit 1
-        fi
+        stop_spinner "true" "TypeScript compilation complete"
+        rm -f "$BUILD_LOG"
     fi
     
     # UI build with spinner
+    print_substep "Building UI components..."
     start_spinner "Building UI..."
     if pnpm ui:build > "$BUILD_LOG" 2>&1; then
         stop_spinner "true" "UI build complete"
