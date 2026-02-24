@@ -599,7 +599,7 @@ build_project() {
         print_substep "   运行 pnpm build (主要构建)..."
         if ! pnpm build > "$BUILD_LOG" 2>&1; then
             # 检查是否是 rolldown/canvas:a2ui:bundle 失败（CPU 指令不兼容）
-            if grep -q "Illegal instruction" "$BUILD_LOG" 2>/dev/null || grep -q "rolldown" "$BUILD_LOG" 2>/dev/null; then
+            if grep -qE "Illegal instruction|SIGILL|Invalid machine instruction|rolldown" "$BUILD_LOG" 2>/dev/null; then
                 # rolldown 依赖 CPU 指令集（Rust 编译）无法在此设备运行
                 # 直接从 npm 下载已发布的预构建 dist/
                 stop_spinner "false" "本地编译不可用 (rolldown CPU 不兼容)"

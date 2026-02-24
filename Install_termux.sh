@@ -647,7 +647,7 @@ build_project() {
         print_substep "   Running tsdown (main build)..."
         if ! $TSDOWN_CMD > "$BUILD_LOG" 2>&1; then
             # Check if it's a SIGILL / rolldown CPU incompatibility
-            if grep -q "Illegal instruction\|SIGILL\|rolldown" "$BUILD_LOG" 2>/dev/null; then
+            if grep -qE "Illegal instruction|SIGILL|Invalid machine instruction|rolldown" "$BUILD_LOG" 2>/dev/null; then
                 stop_spinner "false" "tsdown/rolldown CPU incompatible (SIGILL)"
                 print_substep "   Downloading pre-built dist/ from npm instead..."
                 start_spinner "Fetching pre-built dist/ (no local compilation)..."
