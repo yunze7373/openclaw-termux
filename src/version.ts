@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 
 declare const __OPENCLAW_VERSION__: string | undefined;
-const CORE_PACKAGE_NAMES = ["openclaw", "openclaw-android"];
+const CORE_PACKAGE_NAME = "openclaw";
 
 const PACKAGE_JSON_CANDIDATES = [
   "../package.json",
@@ -30,7 +30,7 @@ function readVersionFromJsonCandidates(
         if (!version) {
           continue;
         }
-        if (opts.requirePackageName && (!parsed.name || !CORE_PACKAGE_NAMES.includes(parsed.name))) {
+        if (opts.requirePackageName && parsed.name !== CORE_PACKAGE_NAME) {
           continue;
         }
         return version;

@@ -1,5 +1,6 @@
 {
-  "name": "openclaw-android",
+  "name": "openclaw",
+  "displayName": "openclaw-android",
   "version": "2026.2.22",
   "description": "OpenClaw for Android/Termux - Personal AI assistant for Android",
   "keywords": [],
