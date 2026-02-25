@@ -4,8 +4,9 @@ const env = {
   NODE_ENV: "production",
 };
 
-// Exclude native bindings that can't be bundled on all platforms (e.g. Termux/Android)
-const external = ["@napi-rs/canvas", "@napi-rs/canvas-android-arm64"];
+// Exclude native bindings and platform-incompatible packages that can't be bundled on all platforms (e.g. Termux/Android)
+// playwright-core throws "Unsupported platform: android" at module load time
+const external = ["@napi-rs/canvas", "@napi-rs/canvas-android-arm64", "playwright-core"];
 
 export default defineConfig([
   {

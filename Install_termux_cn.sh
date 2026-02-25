@@ -498,30 +498,31 @@ const external = ["@napi-rs/canvas", "@napi-rs/canvas-android-arm64"];
         fi
     fi
 
-    # 补丁 3: 禁用 playwright-core 在 Termux 上（防止导入时的 SIGILL 崩溃）
-    # playwright-core 检查 process.platform === "android" 并抛出错误
-    # 我们直接替换真实包为 stub，让 require("playwright-core") 返回空对象而不是崩溃
-    if [[ -d "$PROJECT_ROOT/node_modules/playwright-core" ]]; then
-        # Backup the real playwright-core
-        mv "$PROJECT_ROOT/node_modules/playwright-core" "$PROJECT_ROOT/node_modules/playwright-core.disabled" 2>/dev/null || true
+    # 补丁 3: playwright-core stub 将在 pnpm install 之后注入
+    # (见 build_project -> stub_playwright_core)
+    # 注意：不在这里创建 stub，因为 pnpm install 会覆盖它
+
+    if [[ $PATCHED -gt 0 ]]; then
+        print_success "已应用 $PATCHED 个 Termux 兼容性补丁"
+    else
+        print_success "Termux 兼容性补丁已就位"
     fi
-    
-    # Create stub at the standard location that Node will find
-    mkdir -p "$PROJECT_ROOT/node_modules/playwright-core"
-    cat > "$PROJECT_ROOT/node_modules/playwright-core/package.json" << 'STUB_EOF'
-{
-  "name": "playwright-core",
-  "version": "0.0.0-termux-stub",
-  "main": "index.js",
-  "description": "Stub for playwright-core on Termux/Android"
 }
-STUB_EOF
-    cat > "$PROJECT_ROOT/node_modules/playwright-core/index.js" << 'STUB_EOF'
-// Stub for playwright-core on Termux/Android
-// The real playwright-core fails with:
-// "Error: Unsupported platform: android" (at registry/index.js:486)
-// This stub allows the application to load without crashing,
-// while browser/web automation features gracefully report unavailability
+
+# ============================================================================
+# playwright-core stub (必须在 pnpm install 之后运行!)
+# ============================================================================
+
+stub_playwright_core() {
+    # 仅在 Termux 平台执行
+    [[ "$PLATFORM" != "termux" ]] && return 0
+
+    # playwright-core 在 Android 上会抛出 "Unsupported platform: android" 崩溃
+    # 我们替换真实包为 stub，让 require("playwright-core") 返回空对象
+
+    local PW_STUB_JS='// Stub for playwright-core on Termux/Android
+// The real playwright-core throws: "Error: Unsupported platform: android"
+// This stub allows the app to load without crashing
 module.exports = {
   chromium: null,
   firefox: null,
@@ -529,16 +530,55 @@ module.exports = {
   devices: {},
   errors: {},
   selectors: {},
-  _addSelectorsTag: () => {},
-};
-STUB_EOF
-    PATCHED=$((PATCHED + 1))
+  _addSelectorsTag: function() {},
+};'
 
-    if [[ $PATCHED -gt 0 ]]; then
-        print_success "已应用 $PATCHED 个 Termux 兼容性补丁"
-    else
-        print_success "Termux 兼容性补丁已就位"
+    local PW_STUB_PKG='{
+  "name": "playwright-core",
+  "version": "0.0.0-termux-stub",
+  "main": "index.js",
+  "description": "Stub for playwright-core on Termux/Android"
+}'
+
+    # 1. 替换 pnpm .pnpm store 中的真实 playwright-core（实际文件位置）
+    local pnpm_pw_dirs
+    pnpm_pw_dirs=$(find "$PROJECT_ROOT/node_modules/.pnpm" -maxdepth 1 -type d -name 'playwright-core@*' 2>/dev/null || true)
+    for pw_dir in $pnpm_pw_dirs; do
+        local real_dir="$pw_dir/node_modules/playwright-core"
+        if [[ -d "$real_dir" ]]; then
+            # 替换真实文件为 stub
+            rm -rf "$real_dir/lib" "$real_dir/types" 2>/dev/null || true
+            echo "$PW_STUB_JS" > "$real_dir/index.js"
+            # 保留原始 package.json 中的 name/version 以满足 pnpm 校验
+            if [[ -f "$real_dir/package.json" ]]; then
+                # 用 node 修改 main 字段指向我们的 stub
+                node -e "
+                    const fs = require('fs');
+                    const p = JSON.parse(fs.readFileSync('$real_dir/package.json', 'utf8'));
+                    p.main = 'index.js';
+                    fs.writeFileSync('$real_dir/package.json', JSON.stringify(p, null, 2));
+                " 2>/dev/null || echo "$PW_STUB_PKG" > "$real_dir/package.json"
+            fi
+        fi
+    done
+
+    # 2. 替换/创建顶层 node_modules/playwright-core（symlink 或 directory）
+    local top_pw="$PROJECT_ROOT/node_modules/playwright-core"
+    # 如果是 symlink（pnpm 默认），先删除 symlink
+    if [[ -L "$top_pw" ]]; then
+        rm -f "$top_pw"
+    elif [[ -d "$top_pw" ]]; then
+        rm -rf "$top_pw"
     fi
+    mkdir -p "$top_pw"
+    echo "$PW_STUB_PKG" > "$top_pw/package.json"
+    echo "$PW_STUB_JS" > "$top_pw/index.js"
+
+    # 3. 如果有 .pnpm store 中的 deep nested playwright-core，也处理
+    find "$PROJECT_ROOT/node_modules/.pnpm" -path "*/node_modules/playwright-core/lib/server/registry/index.js" -type f 2>/dev/null | while read -r registry_file; do
+        # 替换 registry/index.js 中的平台检查，直接导出空
+        echo "module.exports = {};" > "$registry_file" 2>/dev/null || true
+    done
 }
 
 # ============================================================================
@@ -605,6 +645,8 @@ build_project() {
             # 手动运行兼容的 postinstall 脚本
             print_substep "运行 postinstall 脚本..."
             node node_modules/.pnpm/esbuild*/node_modules/esbuild/install.js 2>/dev/null || true
+            # 关键: pnpm install 会覆盖之前的 stub，必须在安装后重新注入
+            stub_playwright_core
             stop_spinner "true" "npm 依赖安装完成"
             rm -f "$BUILD_LOG"
         else

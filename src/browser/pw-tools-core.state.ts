@@ -1,6 +1,21 @@
 import type { CDPSession, Page } from "playwright-core";
-import { devices as playwrightDevices } from "playwright-core";
 import { ensurePageState, getPageForTargetId } from "./pw-session.js";
+
+// Lazy-load playwright devices to avoid crashing on Android/Termux
+// where playwright-core throws "Unsupported platform: android" at import time
+let _playwrightDevices: Record<string, unknown> | null = null;
+function getPlaywrightDevices(): Record<string, unknown> {
+  if (!_playwrightDevices) {
+    try {
+      // eval prevents esbuild/bundlers from statically resolving the require
+      const pw = eval('require("playwright-core")');
+      _playwrightDevices = pw.devices ?? {};
+    } catch {
+      _playwrightDevices = {};
+    }
+  }
+  return _playwrightDevices;
+}
 
 async function withCdpSession<T>(page: Page, fn: (session: CDPSession) => Promise<T>): Promise<T> {
   const session = await page.context().newCDPSession(page);
@@ -162,7 +177,7 @@ export async function setDeviceViaPlaywright(opts: {
   if (!name) {
     throw new Error("device name is required");
   }
-  const descriptor = (playwrightDevices as Record<string, unknown>)[name] as
+  const descriptor = (getPlaywrightDevices())[name] as
     | {
         userAgent?: string;
         viewport?: { width: number; height: number };

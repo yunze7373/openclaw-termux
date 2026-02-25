@@ -517,30 +517,31 @@ const external = ["@napi-rs/canvas", "@napi-rs/canvas-android-arm64"];
         fi
     fi
 
-    # Patch 3: Disable playwright-core on Termux to prevent crash from "Unsupported platform: android"
-    # playwright-core checks process.platform and throws error at registry/index.js:486
-    # We replace the real package with a stub, so require("playwright-core") returns empty object instead of crashing
-    if [[ -d "$PROJECT_ROOT/node_modules/playwright-core" ]]; then
-        # Backup the real playwright-core
-        mv "$PROJECT_ROOT/node_modules/playwright-core" "$PROJECT_ROOT/node_modules/playwright-core.disabled" 2>/dev/null || true
+    # Patch 3: playwright-core stub is injected AFTER pnpm install
+    # (see build_project -> stub_playwright_core)
+    # Note: cannot create stub here because pnpm install would overwrite it
+
+    if [[ $PATCHED -gt 0 ]]; then
+        print_success "Applied $PATCHED Termux compatibility patches"
+    else
+        print_success "Termux compatibility patches already in place"
     fi
-    
-    # Create stub at the standard location that Node will find
-    mkdir -p "$PROJECT_ROOT/node_modules/playwright-core"
-    cat > "$PROJECT_ROOT/node_modules/playwright-core/package.json" << 'STUB_EOF'
-{
-  "name": "playwright-core",
-  "version": "0.0.0-termux-stub",
-  "main": "index.js",
-  "description": "Stub for playwright-core on Termux/Android"
 }
-STUB_EOF
-    cat > "$PROJECT_ROOT/node_modules/playwright-core/index.js" << 'STUB_EOF'
-// Stub for playwright-core on Termux/Android
-// The real playwright-core fails with:
-// "Error: Unsupported platform: android" (at registry/index.js:486)
-// This stub allows the application to load without crashing,
-// while browser/web automation features gracefully report unavailability
+
+# ============================================================================
+# playwright-core stub (MUST run AFTER pnpm install!)
+# ============================================================================
+
+stub_playwright_core() {
+    # Only run on Termux
+    [[ "$PLATFORM" != "termux" ]] && return 0
+
+    # playwright-core throws "Unsupported platform: android" at import time on Android
+    # Replace the real package with a stub so require("playwright-core") returns safe empty object
+
+    local PW_STUB_JS='// Stub for playwright-core on Termux/Android
+// The real playwright-core throws: "Error: Unsupported platform: android"
+// This stub allows the app to load without crashing
 module.exports = {
   chromium: null,
   firefox: null,
@@ -548,16 +549,50 @@ module.exports = {
   devices: {},
   errors: {},
   selectors: {},
-  _addSelectorsTag: () => {},
-};
-STUB_EOF
-    PATCHED=$((PATCHED + 1))
+  _addSelectorsTag: function() {},
+};'
 
-    if [[ $PATCHED -gt 0 ]]; then
-        print_success "Applied $PATCHED Termux compatibility patches"
-    else
-        print_success "Termux compatibility patches already in place"
+    local PW_STUB_PKG='{
+  "name": "playwright-core",
+  "version": "0.0.0-termux-stub",
+  "main": "index.js",
+  "description": "Stub for playwright-core on Termux/Android"
+}'
+
+    # 1. Replace real playwright-core in pnpm .pnpm store (actual file location)
+    local pnpm_pw_dirs
+    pnpm_pw_dirs=$(find "$PROJECT_ROOT/node_modules/.pnpm" -maxdepth 1 -type d -name 'playwright-core@*' 2>/dev/null || true)
+    for pw_dir in $pnpm_pw_dirs; do
+        local real_dir="$pw_dir/node_modules/playwright-core"
+        if [[ -d "$real_dir" ]]; then
+            rm -rf "$real_dir/lib" "$real_dir/types" 2>/dev/null || true
+            echo "$PW_STUB_JS" > "$real_dir/index.js"
+            if [[ -f "$real_dir/package.json" ]]; then
+                node -e "
+                    const fs = require('fs');
+                    const p = JSON.parse(fs.readFileSync('$real_dir/package.json', 'utf8'));
+                    p.main = 'index.js';
+                    fs.writeFileSync('$real_dir/package.json', JSON.stringify(p, null, 2));
+                " 2>/dev/null || echo "$PW_STUB_PKG" > "$real_dir/package.json"
+            fi
+        fi
+    done
+
+    # 2. Replace/create top-level node_modules/playwright-core (symlink or directory)
+    local top_pw="$PROJECT_ROOT/node_modules/playwright-core"
+    if [[ -L "$top_pw" ]]; then
+        rm -f "$top_pw"
+    elif [[ -d "$top_pw" ]]; then
+        rm -rf "$top_pw"
     fi
+    mkdir -p "$top_pw"
+    echo "$PW_STUB_PKG" > "$top_pw/package.json"
+    echo "$PW_STUB_JS" > "$top_pw/index.js"
+
+    # 3. Handle deep nested playwright-core registry files
+    find "$PROJECT_ROOT/node_modules/.pnpm" -path "*/node_modules/playwright-core/lib/server/registry/index.js" -type f 2>/dev/null | while read -r registry_file; do
+        echo "module.exports = {};" > "$registry_file" 2>/dev/null || true
+    done
 }
 
 # ============================================================================
@@ -626,6 +661,8 @@ build_project() {
             # Run compatible postinstall scripts
             print_substep "Running postinstall scripts..."
             node node_modules/.pnpm/esbuild*/node_modules/esbuild/install.js 2>/dev/null || true
+            # Critical: pnpm install overwrites previous stubs, must re-inject after install
+            stub_playwright_core
             stop_spinner "true" "npm dependencies installed"
             rm -f "$BUILD_LOG"
         else
