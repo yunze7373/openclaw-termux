@@ -20,16 +20,23 @@ import type { WizardProgress, WizardPrompter } from "./prompts.js";
 import { WizardCancelledError } from "./prompts.js";
 
 /**
- * Ensure process.stdin is flowing before each interactive prompt.
+ * Ensure process.stdin is flowing and in raw mode before each interactive prompt.
  *
- * @clack/core's Prompt.close() calls rl.close() which internally calls
- * stdin.pause().  The *next* prompt's readline.createInterface() should
- * call input.resume(), but on Node.js ≥ 22 running inside Termux
- * (process.platform === "android"), the resume does not take effect
- * reliably — leaving stdin permanently paused and the prompt hung.
+ * Two known issues on Node.js ≥ 22 / Termux (process.platform === "android"):
  *
- * Calling resume() here is harmless on platforms where stdin is already
- * flowing, and fixes the hang on Termux/Android.
+ * 1. PAUSE: @clack/core's Prompt.close() calls rl.close() → stdin.pause().
+ *    The next prompt's readline.createInterface() should resume it, but on
+ *    Android the resume does not reliably take effect, leaving stdin paused
+ *    and the prompt hung indefinitely.
+ *
+ * 2. RAW MODE: @clack/core calls setRawMode(true) on prompt start and
+ *    setRawMode(false) on close().  On Android the close-time setRawMode(false)
+ *    leaves stdin in cooked/echoed mode; the next prompt's setRawMode(true)
+ *    call succeeds but the terminal's echo inhibition is not applied in time,
+ *    causing arrow-key escape sequences (e.g. ^[a) to be printed raw instead
+ *    of being intercepted by readline.
+ *
+ * Calling resume() and setRawMode(true) here is harmless on other platforms.
  */
 function ensureStdinFlowing(): void {
   try {
@@ -37,8 +44,14 @@ function ensureStdinFlowing(): void {
     if (typeof stdin.isPaused === "function" && stdin.isPaused()) {
       stdin.resume();
     }
+    // Re-enable raw mode so the prompt can intercept arrow keys / escape
+    // sequences.  Without this, on Termux/Android the arrow keys are echoed
+    // as raw bytes (^[A etc.) instead of being captured by @clack/core.
+    if (stdin.isTTY && typeof stdin.setRawMode === "function") {
+      stdin.setRawMode(true);
+    }
   } catch {
-    // best-effort — ignore errors (e.g. stdin already destroyed)
+    // best-effort — ignore errors (e.g. stdin not a TTY, already destroyed)
   }
 }
 
