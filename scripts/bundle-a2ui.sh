@@ -13,6 +13,22 @@ OUTPUT_FILE="$ROOT_DIR/src/canvas-host/a2ui/a2ui.bundle.js"
 A2UI_RENDERER_DIR="$ROOT_DIR/vendor/a2ui/renderers/lit"
 A2UI_APP_DIR="$ROOT_DIR/apps/shared/OpenClawKit/Tools/CanvasA2UI"
 
+# Detect if running on Termux/Android.
+# On Android, rolldown lacks native bindings; gracefully skip bundling.
+if [[ -d "/data/data/com.termux" ]] && command -v node >/dev/null 2>&1; then
+  ANDROID_ARCH=$(node -e "console.log(require('os').arch())" 2>/dev/null || echo "unknown")
+  if [[ "$ANDROID_ARCH" == "arm64" ]]; then
+    echo "Termux/Android ARM64 detected: rolldown lacks native bindings."
+    if [[ ! -f "$OUTPUT_FILE" ]]; then
+      echo "Creating stub A2UI bundle (canvas UI disabled on Termux)." >&2
+      mkdir -p "$(dirname "$OUTPUT_FILE")"
+      echo "// Stub: A2UI canvas not available on Termux/Android ARM64 (rolldown platform limitation)" > "$OUTPUT_FILE"
+    fi
+    echo "Skipping rolldown bundling; CLI will work without canvas UI."
+    exit 0
+  fi
+fi
+
 # Docker builds exclude vendor/apps via .dockerignore.
 # In that environment we can keep a prebuilt bundle only if it exists.
 if [[ ! -d "$A2UI_RENDERER_DIR" || ! -d "$A2UI_APP_DIR" ]]; then
