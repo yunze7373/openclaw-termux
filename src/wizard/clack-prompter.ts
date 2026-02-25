@@ -19,6 +19,29 @@ import { theme } from "../terminal/theme.js";
 import type { WizardProgress, WizardPrompter } from "./prompts.js";
 import { WizardCancelledError } from "./prompts.js";
 
+/**
+ * Ensure process.stdin is flowing before each interactive prompt.
+ *
+ * @clack/core's Prompt.close() calls rl.close() which internally calls
+ * stdin.pause().  The *next* prompt's readline.createInterface() should
+ * call input.resume(), but on Node.js ≥ 22 running inside Termux
+ * (process.platform === "android"), the resume does not take effect
+ * reliably — leaving stdin permanently paused and the prompt hung.
+ *
+ * Calling resume() here is harmless on platforms where stdin is already
+ * flowing, and fixes the hang on Termux/Android.
+ */
+function ensureStdinFlowing(): void {
+  try {
+    const stdin = process.stdin;
+    if (typeof stdin.isPaused === "function" && stdin.isPaused()) {
+      stdin.resume();
+    }
+  } catch {
+    // best-effort — ignore errors (e.g. stdin already destroyed)
+  }
+}
+
 function guardCancel<T>(value: T | symbol): T {
   if (isCancel(value)) {
     cancel(stylePromptTitle("Setup cancelled.") ?? "Setup cancelled.");
@@ -62,8 +85,9 @@ export function createClackPrompter(): WizardPrompter {
     note: async (message, title) => {
       emitNote(message, title);
     },
-    select: async (params) =>
-      guardCancel(
+    select: async (params) => {
+      ensureStdinFlowing();
+      return guardCancel(
         await select({
           message: stylePromptMessage(params.message),
           options: params.options.map((opt) => {
@@ -72,8 +96,10 @@ export function createClackPrompter(): WizardPrompter {
           }) as Option<(typeof params.options)[number]["value"]>[],
           initialValue: params.initialValue,
         }),
-      ),
+      );
+    },
     multiselect: async (params) => {
+      ensureStdinFlowing();
       const options = params.options.map((opt) => {
         const base = { value: opt.value, label: opt.label };
         return opt.hint === undefined ? base : { ...base, hint: stylePromptHint(opt.hint) };
@@ -99,6 +125,7 @@ export function createClackPrompter(): WizardPrompter {
       );
     },
     text: async (params) => {
+      ensureStdinFlowing();
       const validate = params.validate;
       return guardCancel(
         await text({
@@ -109,13 +136,15 @@ export function createClackPrompter(): WizardPrompter {
         }),
       );
     },
-    confirm: async (params) =>
-      guardCancel(
+    confirm: async (params) => {
+      ensureStdinFlowing();
+      return guardCancel(
         await confirm({
           message: stylePromptMessage(params.message),
           initialValue: params.initialValue,
         }),
-      ),
+      );
+    },
     progress: (label: string): WizardProgress => {
       const spin = spinner();
       spin.start(theme.accent(label));
