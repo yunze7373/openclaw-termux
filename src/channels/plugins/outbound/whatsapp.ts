@@ -1,9 +1,8 @@
-import type { ChannelOutboundAdapter } from "../types.js";
 import { chunkText } from "../../../auto-reply/chunk.js";
 import { shouldLogVerbose } from "../../../globals.js";
-import { missingTargetError } from "../../../infra/outbound/target-errors.js";
 import { sendPollWhatsApp } from "../../../web/outbound.js";
-import { isWhatsAppGroupJid, normalizeWhatsAppTarget } from "../../../whatsapp/normalize.js";
+import { resolveWhatsAppOutboundTarget } from "../../../whatsapp/resolve-outbound-target.js";
+import type { ChannelOutboundAdapter } from "../types.js";
 
 export const whatsappOutbound: ChannelOutboundAdapter = {
   deliveryMode: "gateway",
@@ -11,51 +10,41 @@ export const whatsappOutbound: ChannelOutboundAdapter = {
   chunkerMode: "text",
   textChunkLimit: 4000,
   pollMaxOptions: 12,
-  resolveTarget: ({ to, allowFrom, mode }) => {
-    const trimmed = to?.trim() ?? "";
-    const allowListRaw = (allowFrom ?? []).map((entry) => String(entry).trim()).filter(Boolean);
-    const hasWildcard = allowListRaw.includes("*");
-    const allowList = allowListRaw
-      .filter((entry) => entry !== "*")
-      .map((entry) => normalizeWhatsAppTarget(entry))
-      .filter((entry): entry is string => Boolean(entry));
-
-    if (trimmed) {
-      const normalizedTo = normalizeWhatsAppTarget(trimmed);
-      if (!normalizedTo) {
-        if ((mode === "implicit" || mode === "heartbeat") && allowList.length > 0) {
-          return { ok: true, to: allowList[0] };
-        }
-        return {
-          ok: false,
-          error: missingTargetError(
-            "WhatsApp",
-            "<E.164|group JID> or channels.whatsapp.allowFrom[0]",
-          ),
-        };
-      }
-      if (isWhatsAppGroupJid(normalizedTo)) {
-        return { ok: true, to: normalizedTo };
-      }
-      if (mode === "implicit" || mode === "heartbeat") {
-        if (hasWildcard || allowList.length === 0) {
-          return { ok: true, to: normalizedTo };
-        }
-        if (allowList.includes(normalizedTo)) {
-          return { ok: true, to: normalizedTo };
-        }
-        return { ok: true, to: allowList[0] };
-      }
-      return { ok: true, to: normalizedTo };
+  resolveTarget: ({ to, allowFrom, mode }) =>
+    resolveWhatsAppOutboundTarget({ to, allowFrom, mode }),
+  sendPayload: async (ctx) => {
+    const text = ctx.payload.text ?? "";
+    const urls = ctx.payload.mediaUrls?.length
+      ? ctx.payload.mediaUrls
+      : ctx.payload.mediaUrl
+        ? [ctx.payload.mediaUrl]
+        : [];
+    if (!text && urls.length === 0) {
+      return { channel: "whatsapp", messageId: "" };
     }
-
-    if (allowList.length > 0) {
-      return { ok: true, to: allowList[0] };
+    if (urls.length > 0) {
+      let lastResult = await whatsappOutbound.sendMedia!({
+        ...ctx,
+        text,
+        mediaUrl: urls[0],
+      });
+      for (let i = 1; i < urls.length; i++) {
+        lastResult = await whatsappOutbound.sendMedia!({
+          ...ctx,
+          text: "",
+          mediaUrl: urls[i],
+        });
+      }
+      return lastResult;
     }
-    return {
-      ok: false,
-      error: missingTargetError("WhatsApp", "<E.164|group JID> or channels.whatsapp.allowFrom[0]"),
-    };
+    const limit = whatsappOutbound.textChunkLimit;
+    const chunks =
+      limit && whatsappOutbound.chunker ? whatsappOutbound.chunker(text, limit) : [text];
+    let lastResult: Awaited<ReturnType<NonNullable<typeof whatsappOutbound.sendText>>>;
+    for (const chunk of chunks) {
+      lastResult = await whatsappOutbound.sendText!({ ...ctx, text: chunk });
+    }
+    return lastResult!;
   },
   sendText: async ({ to, text, accountId, deps, gifPlayback }) => {
     const send =
@@ -67,12 +56,13 @@ export const whatsappOutbound: ChannelOutboundAdapter = {
     });
     return { channel: "whatsapp", ...result };
   },
-  sendMedia: async ({ to, text, mediaUrl, accountId, deps, gifPlayback }) => {
+  sendMedia: async ({ to, text, mediaUrl, mediaLocalRoots, accountId, deps, gifPlayback }) => {
     const send =
       deps?.sendWhatsApp ?? (await import("../../../web/outbound.js")).sendMessageWhatsApp;
     const result = await send(to, text, {
       verbose: false,
       mediaUrl,
+      mediaLocalRoots,
       accountId: accountId ?? undefined,
       gifPlayback,
     });

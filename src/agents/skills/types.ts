@@ -2,7 +2,7 @@ import type { Skill } from "@mariozechner/pi-coding-agent";
 
 export type SkillInstallSpec = {
   id?: string;
-  kind: "brew" | "node" | "go" | "uv" | "pip" | "download" | "cargo";
+  kind: "brew" | "node" | "go" | "uv" | "download";
   label?: string;
   bins?: string[];
   os?: string[];
@@ -81,7 +81,9 @@ export type SkillEligibilityContext = {
 
 export type SkillSnapshot = {
   prompt: string;
-  skills: Array<{ name: string; primaryEnv?: string }>;
+  skills: Array<{ name: string; primaryEnv?: string; requiredEnv?: string[] }>;
+  /** Normalized agent-level filter used to build this snapshot; undefined means unrestricted. */
+  skillFilter?: string[];
   resolvedSkills?: Skill[];
   version?: number;
 };

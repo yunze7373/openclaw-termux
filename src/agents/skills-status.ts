@@ -1,5 +1,7 @@
 import path from "node:path";
 import type { OpenClawConfig } from "../config/config.js";
+import { evaluateEntryRequirementsForCurrentPlatform } from "../shared/entry-status.js";
+import type { RequirementConfigCheck, Requirements } from "../shared/requirements.js";
 import { CONFIG_DIR } from "../utils.js";
 import {
   hasBinary,
@@ -7,7 +9,6 @@ import {
   isConfigPathTruthy,
   loadWorkspaceSkillEntries,
   resolveBundledAllowlist,
-  resolveConfigPath,
   resolveSkillConfig,
   resolveSkillsInstallPreferences,
   type SkillEntry,
@@ -17,11 +18,7 @@ import {
 } from "./skills.js";
 import { resolveBundledSkillsContext } from "./skills/bundled-context.js";
 
-export type SkillStatusConfigCheck = {
-  path: string;
-  value: unknown;
-  satisfied: boolean;
-};
+export type SkillStatusConfigCheck = RequirementConfigCheck;
 
 export type SkillInstallOption = {
   id: string;
@@ -45,20 +42,8 @@ export type SkillStatusEntry = {
   disabled: boolean;
   blockedByAllowlist: boolean;
   eligible: boolean;
-  requirements: {
-    bins: string[];
-    anyBins: string[];
-    env: string[];
-    config: string[];
-    os: string[];
-  };
-  missing: {
-    bins: string[];
-    anyBins: string[];
-    env: string[];
-    config: string[];
-    os: string[];
-  };
+  requirements: Requirements;
+  missing: Requirements;
   configChecks: SkillStatusConfigCheck[];
   install: SkillInstallOption[];
 };
@@ -80,6 +65,7 @@ function selectPreferredInstallSpec(
   if (install.length === 0) {
     return undefined;
   }
+
   const indexed = install.map((spec, index) => ({ spec, index }));
   const findKind = (kind: SkillInstallSpec["kind"]) =>
     indexed.find((item) => item.spec.kind === kind);
@@ -88,81 +74,54 @@ function selectPreferredInstallSpec(
   const nodeSpec = findKind("node");
   const goSpec = findKind("go");
   const uvSpec = findKind("uv");
-  const pipSpec = findKind("pip");
-  const cargoSpec = findKind("cargo");
+  const downloadSpec = findKind("download");
+  const brewAvailable = hasBinary("brew");
 
-  const isTermuxAndroid = process.platform === "android" || Boolean(process.env.TERMUX_VERSION) || (process.env.PREFIX || "").includes("com.termux") || Boolean(process.env.ANDROID_ROOT);
-  if (isTermuxAndroid) {
-    // Termux often lacks brew and treats "android" as "linux" for most CLI tooling.
-    // Prefer npm/go/pip/cargo installers when available.
-    if (cargoSpec) {
-      return cargoSpec;
+  // Table-driven preference chain; first match wins.
+  const pickers: Array<() => { spec: SkillInstallSpec; index: number } | undefined> = [
+    () => (prefs.preferBrew && brewAvailable ? brewSpec : undefined),
+    () => uvSpec,
+    () => nodeSpec,
+    // Only prefer brew when available to avoid guaranteed failure on Linux/Docker.
+    () => (brewAvailable ? brewSpec : undefined),
+    () => goSpec,
+    // Prefer download over an unavailable brew spec.
+    () => downloadSpec,
+    // Last resort: surface descriptive brew-missing error instead of "no installer found".
+    () => brewSpec,
+    () => indexed[0],
+  ];
+
+  for (const pick of pickers) {
+    const selected = pick();
+    if (selected) {
+      return selected;
     }
-    if (nodeSpec) {
-      return nodeSpec;
-    }
-    if (pipSpec) {
-      return pipSpec;
-    }
-    if (goSpec) {
-      return goSpec;
-    }
-    if (uvSpec) {
-      return uvSpec;
-    }
-    if (brewSpec) {
-      return brewSpec;
-    }
-    return indexed[0];
   }
 
-  if (prefs.preferBrew && hasBinary("brew") && brewSpec) {
-    return brewSpec;
-  }
-  if (cargoSpec) {
-    return cargoSpec;
-  }
-  if (uvSpec) {
-    return uvSpec;
-  }
-  if (pipSpec) {
-    return pipSpec;
-  }
-  if (nodeSpec) {
-    return nodeSpec;
-  }
-  if (brewSpec) {
-    return brewSpec;
-  }
-  if (goSpec) {
-    return goSpec;
-  }
-  return indexed[0];
-}
-
-function resolveSkillOsFilter(): { platform: NodeJS.Platform; compatible: NodeJS.Platform[] } {
-  const raw = process.platform;
-  const isTermuxAndroid = raw === "android" || Boolean(process.env.TERMUX_VERSION);
-  if (!isTermuxAndroid) {
-    return { platform: raw, compatible: [raw] };
-  }
-  // Skills typically declare linux, not android, but Termux should accept both.
-  return { platform: "linux", compatible: ["linux", "android"] };
+  return undefined;
 }
 
 function normalizeInstallOptions(
   entry: SkillEntry,
   prefs: SkillsInstallPreferences,
 ): SkillInstallOption[] {
+  // If the skill is explicitly OS-scoped, don't surface install actions on unsupported platforms.
+  // (Installers run locally; remote OS eligibility is handled separately.)
+  const requiredOs = entry.metadata?.os ?? [];
+  if (requiredOs.length > 0 && !requiredOs.includes(process.platform)) {
+    return [];
+  }
+
   const install = entry.metadata?.install ?? [];
   if (install.length === 0) {
     return [];
   }
 
-  const { compatible } = resolveSkillOsFilter();
+  const platform = process.platform;
   const filtered = install.filter((spec) => {
     const osList = spec.os ?? [];
-    return osList.length === 0 || compatible.some((os) => osList.includes(os));
+    return osList.length === 0 || osList.includes(platform);
   });
   if (filtered.length === 0) {
     return [];
@@ -184,10 +143,6 @@ function normalizeInstallOptions(
         label = `Install ${spec.module} (go)`;
       } else if (spec.kind === "uv" && spec.package) {
         label = `Install ${spec.package} (uv)`;
-      } else if (spec.kind === "pip" && spec.package) {
-        label = `Install ${spec.package} (pip)`;
-      } else if (spec.kind === "cargo" && spec.package) {
-        label = `Install ${spec.package} (cargo)`;
       } else if (spec.kind === "download" && spec.url) {
         const url = spec.url.trim();
         const last = url.split("/").pop();
@@ -218,100 +173,34 @@ function buildSkillStatus(
   eligibility?: SkillEligibilityContext,
   bundledNames?: Set<string>,
 ): SkillStatusEntry {
-  const osFilter = resolveSkillOsFilter();
   const skillKey = resolveSkillKey(entry);
   const skillConfig = resolveSkillConfig(config, skillKey);
   const disabled = skillConfig?.enabled === false;
   const allowBundled = resolveBundledAllowlist(config);
   const blockedByAllowlist = !isBundledSkillAllowed(entry, allowBundled);
   const always = entry.metadata?.always === true;
-  const emoji = entry.metadata?.emoji ?? entry.frontmatter.emoji;
-  const homepageRaw =
-    entry.metadata?.homepage ??
-    entry.frontmatter.homepage ??
-    entry.frontmatter.website ??
-    entry.frontmatter.url;
-  const homepage = homepageRaw?.trim() ? homepageRaw.trim() : undefined;
+  const isEnvSatisfied = (envName: string) =>
+    Boolean(
+      process.env[envName] ||
+      skillConfig?.env?.[envName] ||
+      (skillConfig?.apiKey && entry.metadata?.primaryEnv === envName),
+    );
+  const isConfigSatisfied = (pathStr: string) => isConfigPathTruthy(config, pathStr);
   const bundled =
     bundledNames && bundledNames.size > 0
       ? bundledNames.has(entry.skill.name)
       : entry.skill.source === "openclaw-bundled";
 
-  const requiredBins = entry.metadata?.requires?.bins ?? [];
-  const requiredAnyBins = entry.metadata?.requires?.anyBins ?? [];
-  const requiredEnv = entry.metadata?.requires?.env ?? [];
-  const requiredConfig = entry.metadata?.requires?.config ?? [];
-  const requiredOs = entry.metadata?.os ?? [];
-
-  const missingBins = requiredBins.filter((bin) => {
-    if (hasBinary(bin)) {
-      return false;
-    }
-    if (eligibility?.remote?.hasBin?.(bin)) {
-      return false;
-    }
-    return true;
-  });
-  const missingAnyBins =
-    requiredAnyBins.length > 0 &&
-    !(
-      requiredAnyBins.some((bin) => hasBinary(bin)) ||
-      eligibility?.remote?.hasAnyBin?.(requiredAnyBins)
-    )
-      ? requiredAnyBins
-      : [];
-  const missingOs =
-    requiredOs.length > 0 &&
-    !osFilter.compatible.some((os) => requiredOs.includes(os)) &&
-    !eligibility?.remote?.platforms?.some((remotePlatform) => {
-      const rp = String(remotePlatform);
-      if (rp === "android") {
-        return requiredOs.includes("linux" as NodeJS.Platform) || requiredOs.includes("android");
-      }
-      return requiredOs.includes(rp as NodeJS.Platform);
-    })
-      ? requiredOs
-      : [];
-
-  const missingEnv: string[] = [];
-  for (const envName of requiredEnv) {
-    if (process.env[envName]) {
-      continue;
-    }
-    if (skillConfig?.env?.[envName]) {
-      continue;
-    }
-    if (skillConfig?.apiKey && entry.metadata?.primaryEnv === envName) {
-      continue;
-    }
-    missingEnv.push(envName);
-  }
-
-  const configChecks: SkillStatusConfigCheck[] = requiredConfig.map((pathStr) => {
-    const value = resolveConfigPath(config, pathStr);
-    const satisfied = isConfigPathTruthy(config, pathStr);
-    return { path: pathStr, value, satisfied };
-  });
-  const missingConfig = configChecks.filter((check) => !check.satisfied).map((check) => check.path);
-
-  const missing = always
-    ? { bins: [], anyBins: [], env: [], config: [], os: [] }
-    : {
-        bins: missingBins,
-        anyBins: missingAnyBins,
-        env: missingEnv,
-        config: missingConfig,
-        os: missingOs,
-      };
-  const eligible =
-    !disabled &&
-    !blockedByAllowlist &&
-    (always ||
-      (missing.bins.length === 0 &&
-        missing.anyBins.length === 0 &&
-        missing.env.length === 0 &&
-        missing.config.length === 0 &&
-        missing.os.length === 0));
+  const { emoji, homepage, required, missing, requirementsSatisfied, configChecks } =
+    evaluateEntryRequirementsForCurrentPlatform({
+      always,
+      entry,
+      hasLocalBin: hasBinary,
+      remote: eligibility?.remote,
+      isEnvSatisfied,
+      isConfigSatisfied,
+    });
+  const eligible = !disabled && !blockedByAllowlist && requirementsSatisfied;
 
   return {
     name: entry.skill.name,
@@ -328,13 +217,7 @@ function buildSkillStatus(
     disabled,
     blockedByAllowlist,
     eligible,
-    requirements: {
-      bins: requiredBins,
-      anyBins: requiredAnyBins,
-      env: requiredEnv,
-      config: requiredConfig,
-      os: requiredOs,
-    },
+    requirements: required,
     missing,
     configChecks,
     install: normalizeInstallOptions(entry, prefs ?? resolveSkillsInstallPreferences(config)),
