@@ -38,29 +38,40 @@ git merge upstream/main --no-edit
 **错误示例：**
 ```
 [openclaw] Failed to start CLI: TypeError: __exportAll is not a function
-    at file:///data/data/com.termux/files/home/openclaw-termux/dist/plugins-Bp-KQ26x.js:475:39
+    at file:///data/data/com.termux/files/home/openclaw-termux/dist/plugins-*.js:475:39
 ```
 
-**原因：** tsdown/rolldown 构建工具生成的 `__exportAll` 辅助函数在 Termux 设备上的 Node.js 运行时中无法正确执行。这通常是因为构建产物在 Windows 上生成，与 Termux/Linux 环境存在兼容性问题。
+**原因：** tsdown/rolldown 的 tree-shaking 会生成 `__exportAll` 辅助函数，该函数在 Termux 设备上的 Node.js 运行时中无法正确执行。
 
-**解决方案：** 在 Termux 设备上重新构建
-```bash
-cd ~/openclaw-termux
-
-# 清理旧的构建产物
-rm -rf dist
-
-# 重新安装依赖
-pnpm install
-
-# 重新构建
-pnpm build
-
-# 启动
-openclaw start
-```
+**解决方案：** 在 `tsdown.config.ts` 中禁用 tree-shaking（见上方"构建配置修复"章节）
 
 **注意：** 不要直接将 Windows 或 macOS 上构建的 `dist` 目录复制到 Termux 设备使用，必须在设备上重新构建。
+
+---
+
+## 构建配置修复
+
+### 禁用 tree-shaking 避免 `__exportAll` 错误
+
+**问题：** tsdown/rolldown 的 tree-shaking 会生成 `__exportAll` 辅助函数，该函数在 Termux 设备上的 Node.js 运行时中无法正确执行。
+
+**解决方案：** 在 `tsdown.config.ts` 中为所有构建配置添加 `treeshake: false`：
+
+```typescript
+export default defineConfig([
+  {
+    entry: "src/index.ts",
+    env,
+    external,
+    fixedExtension: false,
+    platform: "node",
+    treeshake: false,  // 添加此行
+  },
+  // ... 其他配置同样添加
+]);
+```
+
+**原因：** tree-shaking 生成的辅助函数在某些 Node.js 环境（特别是 Termux/Android）中存在兼容性问题。禁用后构建产物会稍大，但可以正常运行。
 
 ---
 
