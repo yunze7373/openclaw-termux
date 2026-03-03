@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { Page, Dialog, FileChooser } from "playwright-core";
+import type { Page } from "playwright-core";
+type Dialog = import("playwright-core").Dialog;
+type FileChooser = import("playwright-core").FileChooser;
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
 import { writeViaSiblingTempPath } from "./output-atomic.js";
 import {
