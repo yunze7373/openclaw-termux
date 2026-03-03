@@ -1,8 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { Page } from "playwright-core";
-import type { Dialog, FileChooser } from "playwright-core";
+import type * as playwright from "playwright-core";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
 import { writeViaSiblingTempPath } from "./output-atomic.js";
 import {
@@ -145,7 +144,7 @@ export async function armFileUploadViaPlaywright(opts: {
 
   void page
     .waitForEvent("filechooser", { timeout })
-    .then(async (fileChooser: FileChooser) => {
+    .then(async (fileChooser: playwright.FileChooser) => {
       if (state.armIdUpload !== armId) {
         return;
       }
@@ -208,7 +207,7 @@ export async function armDialogViaPlaywright(opts: {
 
   void page
     .waitForEvent("dialog", { timeout })
-    .then(async (dialog: Dialog) => {
+    .then(async (dialog: playwright.Dialog) => {
       if (state.armIdDialog !== armId) {
         return;
       }
