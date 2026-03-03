@@ -144,7 +144,7 @@ export async function armFileUploadViaPlaywright(opts: {
 
   void page
     .waitForEvent("filechooser", { timeout })
-    .then(async (fileChooser: import("playwright-core").FileChooser) => {
+    .then(async (fileChooser) => {
       if (state.armIdUpload !== armId) {
         return;
       }
@@ -207,7 +207,7 @@ export async function armDialogViaPlaywright(opts: {
 
   void page
     .waitForEvent("dialog", { timeout })
-    .then(async (dialog: import("playwright-core").Dialog) => {
+    .then(async (dialog) => {
       if (state.armIdDialog !== armId) {
         return;
       }

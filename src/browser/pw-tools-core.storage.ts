@@ -119,7 +119,7 @@ export async function storageClearViaPlaywright(opts: {
   const page = await getPageForTargetId(opts);
   ensurePageState(page);
   await page.evaluate(
-    ({ kind }) => {
+    ({ kind }: { kind: StorageKind }) => {
       const store = kind === "session" ? window.sessionStorage : window.localStorage;
       store.clear();
     },

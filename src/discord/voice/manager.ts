@@ -5,16 +5,6 @@ import path from "node:path";
 import type { Readable } from "node:stream";
 import { ChannelType, type Client, ReadyListener } from "@buape/carbon";
 import type { VoicePlugin } from "@buape/carbon/voice";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const {
-  AudioPlayerStatus,
-  EndBehaviorType,
-  VoiceConnectionStatus,
-  createAudioPlayer,
-  createAudioResource,
-  entersState,
-  joinVoiceChannel,
-} = require("@discordjs/voice") as typeof import("@discordjs/voice");
 import type { AudioPlayer, VoiceConnection } from "@discordjs/voice";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import type { MsgContext } from "../../auto-reply/templating.js";
@@ -40,6 +30,17 @@ import { resolveDiscordOwnerAccess } from "../monitor/allow-list.js";
 import { formatDiscordUserTag } from "../monitor/format.js";
 
 const require = createRequire(import.meta.url);
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const {
+  AudioPlayerStatus,
+  EndBehaviorType,
+  VoiceConnectionStatus,
+  createAudioPlayer,
+  createAudioResource,
+  entersState,
+  joinVoiceChannel,
+} = require("@discordjs/voice") as typeof import("@discordjs/voice");
 
 const SAMPLE_RATE = 48_000;
 const CHANNELS = 2;
