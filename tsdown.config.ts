@@ -14,6 +14,7 @@ export default defineConfig([
     external,
     fixedExtension: false,
     platform: "node",
+    treeshake: false,
   },
   {
     entry: "src/entry.ts",
@@ -21,6 +22,7 @@ export default defineConfig([
     external,
     fixedExtension: false,
     platform: "node",
+    treeshake: false,
   },
   {
     entry: "src/infra/warning-filter.ts",
@@ -28,6 +30,7 @@ export default defineConfig([
     external,
     fixedExtension: false,
     platform: "node",
+    treeshake: false,
   },
   {
     entry: "src/plugin-sdk/index.ts",
@@ -36,6 +39,7 @@ export default defineConfig([
     external,
     fixedExtension: false,
     platform: "node",
+    treeshake: false,
   },
   {
     entry: "src/extensionAPI.ts",
@@ -43,6 +47,7 @@ export default defineConfig([
     external,
     fixedExtension: false,
     platform: "node",
+    treeshake: false,
   },
   {
     entry: ["src/hooks/bundled/*/handler.ts", "src/hooks/llm-slug-generator.ts"],
@@ -50,5 +55,6 @@ export default defineConfig([
     external,
     fixedExtension: false,
     platform: "node",
+    treeshake: false,
   },
 ]);
