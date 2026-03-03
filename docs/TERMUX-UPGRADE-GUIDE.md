@@ -474,6 +474,47 @@ openclaw status
 openclaw doctor
 ```
 
+### 手动修复 PM2 服务配置
+
+如果 `openclaw doctor --fix` 无法解决问题，可以手动重建 PM2 服务：
+
+```bash
+cd ~/openclaw-termux
+
+# 1. 停止并删除旧服务
+pm2 stop openclaw-gateway
+pm2 delete openclaw-gateway
+sleep 1  # 等待删除完成
+
+# 2. 从配置文件读取 token（如果有）
+GATEWAY_TOKEN=$(jq -r '.gateway.auth.token // empty' ~/openclaw-termux/openclaw.json 2>/dev/null)
+
+# 3. 启动新服务，传递 token 环境变量
+if [[ -n "$GATEWAY_TOKEN" ]]; then
+    pm2 start ~/openclaw-termux/openclaw.mjs \
+        --name openclaw-gateway \
+        --interpreter node \
+        --env OPENCLAW_GATEWAY_TOKEN="$GATEWAY_TOKEN" \
+        --force \
+        -- gateway start
+else
+    pm2 start ~/openclaw-termux/openclaw.mjs \
+        --name openclaw-gateway \
+        --interpreter node \
+        --force \
+        -- gateway start
+fi
+
+# 4. 保存 PM2 进程列表
+pm2 save
+```
+
+**注意：** 安装脚本 `Install_termux_cn.sh` 已在 v2026.3.2-termux.1 中修复，包含以下改进：
+- `pm2 delete` 后添加 `sleep 1` 等待删除完成
+- 自动从 `openclaw.json` 读取 token 并传递给 PM2
+- 添加 `--force` 标志确保 PM2 使用最新配置
+- 移除了可能导致冲突的 PATH 操作
+
 ---
 
 ## 有用的命令
