@@ -144,7 +144,7 @@ export async function armFileUploadViaPlaywright(opts: {
 
   void page
     .waitForEvent("filechooser", { timeout })
-    .then(async (fileChooser) => {
+    .then(async (fileChooser: import("playwright-core").FileChooser) => {
       if (state.armIdUpload !== armId) {
         return;
       }
@@ -177,7 +177,7 @@ export async function armFileUploadViaPlaywright(opts: {
             ? await Promise.resolve(fileChooser.element())
             : null;
         if (input) {
-          await input.evaluate((el) => {
+          await input.evaluate((el: any) => {
             el.dispatchEvent(new Event("input", { bubbles: true }));
             el.dispatchEvent(new Event("change", { bubbles: true }));
           });
@@ -207,7 +207,7 @@ export async function armDialogViaPlaywright(opts: {
 
   void page
     .waitForEvent("dialog", { timeout })
-    .then(async (dialog) => {
+    .then(async (dialog: import("playwright-core").Dialog) => {
       if (state.armIdDialog !== armId) {
         return;
       }

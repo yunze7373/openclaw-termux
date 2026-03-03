@@ -118,13 +118,6 @@ function createStreamFnWithExtraParams(
   if (typeof extraParams.maxTokens === "number") {
     streamParams.maxTokens = extraParams.maxTokens;
   }
-  const transport = extraParams.transport;
-  if (transport === "sse" || transport === "websocket" || transport === "auto") {
-    streamParams.transport = transport;
-  } else if (transport != null) {
-    const transportSummary = typeof transport === "string" ? transport : typeof transport;
-    log.warn(`ignoring invalid transport param: ${transportSummary}`);
-  }
   if (typeof extraParams.openaiWsWarmup === "boolean") {
     streamParams.openaiWsWarmup = extraParams.openaiWsWarmup;
   }
@@ -317,10 +310,7 @@ function createOpenAIResponsesContextManagementWrapper(
 function createCodexDefaultTransportWrapper(baseStreamFn: StreamFn | undefined): StreamFn {
   const underlying = baseStreamFn ?? streamSimple;
   return (model, context, options) =>
-    underlying(model, context, {
-      ...options,
-      transport: options?.transport ?? "auto",
-    });
+    underlying(model, context, options);
 }
 
 function createOpenAIDefaultTransportWrapper(baseStreamFn: StreamFn | undefined): StreamFn {
@@ -331,10 +321,6 @@ function createOpenAIDefaultTransportWrapper(baseStreamFn: StreamFn | undefined)
       | undefined;
     const mergedOptions = {
       ...options,
-      transport: options?.transport ?? "auto",
-      // Warm-up is optional in OpenAI docs; enabled by default here for lower
-      // first-turn latency on WebSocket sessions. Set params.openaiWsWarmup=false
-      // to disable per model.
       openaiWsWarmup: typedOptions?.openaiWsWarmup ?? true,
     } as SimpleStreamOptions;
     return underlying(model, context, mergedOptions);

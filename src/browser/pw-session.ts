@@ -340,7 +340,7 @@ async function connectBrowser(cdpUrl: string): Promise<ConnectedBrowser> {
         // Bypass proxy for loopback CDP connections (#31219)
         const browser = await withNoProxyForCdpUrl(endpoint, () =>
           chromium.connectOverCDP(endpoint, { timeout, headers }),
-        );
+        ) as Browser;
         const onDisconnected = () => {
           if (cached?.browser === browser) {
             cached = null;

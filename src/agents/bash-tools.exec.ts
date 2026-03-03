@@ -45,7 +45,6 @@ import {
   chunkString,
   clampWithDefault,
   coerceEnv,
-  killSession,
   readEnvInt,
   resolveSandboxWorkdir,
   resolveWorkdir,
@@ -640,7 +639,10 @@ async function runExecProcess(opts: {
 
   const onTimeout = () => {
     timedOut = true;
-    killSession(session);
+    // Kill the session process
+    if (session.child) {
+      session.child.kill("SIGKILL");
+    }
     if (!timeoutFinalizeTimer) {
       timeoutFinalizeTimer = setTimeout(() => {
         finalizeTimeout();
@@ -799,7 +801,11 @@ async function runExecProcess(opts: {
     startedAt,
     pid: session.pid ?? undefined,
     promise,
-    kill: () => killSession(session),
+    kill: () => {
+      if (session.child) {
+        session.child.kill("SIGKILL");
+      }
+    },
   };
 }
 

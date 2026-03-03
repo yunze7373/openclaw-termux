@@ -535,7 +535,7 @@ export async function screenshotWithLabelsViaPlaywright(opts: {
 
   try {
     if (boxes.length > 0) {
-      await page.evaluate((labels) => {
+      await page.evaluate((labels: Array<{ ref: string; x: number; y: number; w: number; h: number }>) => {
         const existing = document.querySelectorAll("[data-openclaw-labels]");
         existing.forEach((el) => el.remove());
 
@@ -639,7 +639,7 @@ export async function setInputFilesViaPlaywright(opts: {
   try {
     const handle = await locator.elementHandle();
     if (handle) {
-      await handle.evaluate((el) => {
+      await handle.evaluate((el: any) => {
         el.dispatchEvent(new Event("input", { bubbles: true }));
         el.dispatchEvent(new Event("change", { bubbles: true }));
       });
