@@ -1,3 +1,4 @@
+import type { GatewayServiceRuntime } from "./service-runtime.js";
 import {
   installLaunchAgent,
   isLaunchAgentLoaded,
@@ -8,6 +9,16 @@ import {
   uninstallLaunchAgent,
 } from "./launchd.js";
 import {
+  installPm2Process,
+  isPm2ProcessRunning,
+  isTermux,
+  readPm2ProcessCommand,
+  readPm2ProcessRuntime,
+  restartPm2Process,
+  stopPm2Process,
+  uninstallPm2Process,
+} from "./pm2.js";
+import {
   installScheduledTask,
   isScheduledTaskInstalled,
   readScheduledTaskCommand,
@@ -16,15 +27,6 @@ import {
   stopScheduledTask,
   uninstallScheduledTask,
 } from "./schtasks.js";
-import type { GatewayServiceRuntime } from "./service-runtime.js";
-import type {
-  GatewayServiceCommandConfig,
-  GatewayServiceControlArgs,
-  GatewayServiceEnv,
-  GatewayServiceEnvArgs,
-  GatewayServiceInstallArgs,
-  GatewayServiceManageArgs,
-} from "./service-types.js";
 import {
   installSystemdService,
   isSystemdServiceEnabled,
@@ -34,34 +36,41 @@ import {
   stopSystemdService,
   uninstallSystemdService,
 } from "./systemd.js";
-export type {
-  GatewayServiceCommandConfig,
-  GatewayServiceControlArgs,
-  GatewayServiceEnv,
-  GatewayServiceEnvArgs,
-  GatewayServiceInstallArgs,
-  GatewayServiceManageArgs,
-} from "./service-types.js";
 
-function ignoreInstallResult(
-  install: (args: GatewayServiceInstallArgs) => Promise<unknown>,
-): (args: GatewayServiceInstallArgs) => Promise<void> {
-  return async (args) => {
-    await install(args);
-  };
-}
+export type GatewayServiceInstallArgs = {
+  env: Record<string, string | undefined>;
+  stdout: NodeJS.WritableStream;
+  programArguments: string[];
+  workingDirectory?: string;
+  environment?: Record<string, string | undefined>;
+  description?: string;
+};
 
 export type GatewayService = {
   label: string;
   loadedText: string;
   notLoadedText: string;
   install: (args: GatewayServiceInstallArgs) => Promise<void>;
-  uninstall: (args: GatewayServiceManageArgs) => Promise<void>;
-  stop: (args: GatewayServiceControlArgs) => Promise<void>;
-  restart: (args: GatewayServiceControlArgs) => Promise<void>;
-  isLoaded: (args: GatewayServiceEnvArgs) => Promise<boolean>;
-  readCommand: (env: GatewayServiceEnv) => Promise<GatewayServiceCommandConfig | null>;
-  readRuntime: (env: GatewayServiceEnv) => Promise<GatewayServiceRuntime>;
+  uninstall: (args: {
+    env: Record<string, string | undefined>;
+    stdout: NodeJS.WritableStream;
+  }) => Promise<void>;
+  stop: (args: {
+    env?: Record<string, string | undefined>;
+    stdout: NodeJS.WritableStream;
+  }) => Promise<void>;
+  restart: (args: {
+    env?: Record<string, string | undefined>;
+    stdout: NodeJS.WritableStream;
+  }) => Promise<void>;
+  isLoaded: (args: { env?: Record<string, string | undefined> }) => Promise<boolean>;
+  readCommand: (env: Record<string, string | undefined>) => Promise<{
+    programArguments: string[];
+    workingDirectory?: string;
+    environment?: Record<string, string>;
+    sourcePath?: string;
+  } | null>;
+  readRuntime: (env: Record<string, string | undefined>) => Promise<GatewayServiceRuntime>;
 };
 
 export function resolveGatewayService(): GatewayService {
@@ -70,13 +79,59 @@ export function resolveGatewayService(): GatewayService {
       label: "LaunchAgent",
       loadedText: "loaded",
       notLoadedText: "not loaded",
-      install: ignoreInstallResult(installLaunchAgent),
-      uninstall: uninstallLaunchAgent,
-      stop: stopLaunchAgent,
-      restart: restartLaunchAgent,
-      isLoaded: isLaunchAgentLoaded,
+      install: async (args) => {
+        await installLaunchAgent(args);
+      },
+      uninstall: async (args) => {
+        await uninstallLaunchAgent(args);
+      },
+      stop: async (args) => {
+        await stopLaunchAgent({
+          stdout: args.stdout,
+          env: args.env,
+        });
+      },
+      restart: async (args) => {
+        await restartLaunchAgent({
+          stdout: args.stdout,
+          env: args.env,
+        });
+      },
+      isLoaded: async (args) => isLaunchAgentLoaded(args),
       readCommand: readLaunchAgentProgramArguments,
       readRuntime: readLaunchAgentRuntime,
+    };
+  }
+
+  // Termux/Android: use pm2 instead of systemd
+  // Check this BEFORE the generic Linux check
+  // Note: process.platform is "android" on Termux, not "linux"
+  if (process.platform === "android" || (process.platform === "linux" && isTermux())) {
+    return {
+      label: "pm2",
+      loadedText: "running",
+      notLoadedText: "stopped",
+      install: async (args) => {
+        await installPm2Process(args);
+      },
+      uninstall: async (args) => {
+        await uninstallPm2Process(args);
+      },
+      stop: async (args) => {
+        await stopPm2Process({
+          stdout: args.stdout,
+          env: args.env,
+        });
+      },
+      restart: async (args) => {
+        await restartPm2Process({
+          stdout: args.stdout,
+          env: args.env,
+        });
+      },
+      isLoaded: async (args) => isPm2ProcessRunning(args),
+      readCommand: readPm2ProcessCommand,
+      readRuntime: readPm2ProcessRuntime,
     };
   }
 
@@ -85,13 +140,27 @@ export function resolveGatewayService(): GatewayService {
       label: "systemd",
       loadedText: "enabled",
       notLoadedText: "disabled",
-      install: ignoreInstallResult(installSystemdService),
-      uninstall: uninstallSystemdService,
-      stop: stopSystemdService,
-      restart: restartSystemdService,
-      isLoaded: isSystemdServiceEnabled,
+      install: async (args) => {
+        await installSystemdService(args);
+      },
+      uninstall: async (args) => {
+        await uninstallSystemdService(args);
+      },
+      stop: async (args) => {
+        await stopSystemdService({
+          stdout: args.stdout,
+          env: args.env,
+        });
+      },
+      restart: async (args) => {
+        await restartSystemdService({
+          stdout: args.stdout,
+          env: args.env,
+        });
+      },
+      isLoaded: async (args) => isSystemdServiceEnabled(args),
       readCommand: readSystemdServiceExecStart,
-      readRuntime: readSystemdServiceRuntime,
+      readRuntime: async (env) => await readSystemdServiceRuntime(env),
     };
   }
 
@@ -100,13 +169,46 @@ export function resolveGatewayService(): GatewayService {
       label: "Scheduled Task",
       loadedText: "registered",
       notLoadedText: "missing",
-      install: ignoreInstallResult(installScheduledTask),
-      uninstall: uninstallScheduledTask,
-      stop: stopScheduledTask,
-      restart: restartScheduledTask,
-      isLoaded: isScheduledTaskInstalled,
+      install: async (args) => {
+        await installScheduledTask(args);
+      },
+      uninstall: async (args) => {
+        await uninstallScheduledTask(args);
+      },
+      stop: async (args) => {
+        await stopScheduledTask({
+          stdout: args.stdout,
+          env: args.env,
+        });
+      },
+      restart: async (args) => {
+        await restartScheduledTask({
+          stdout: args.stdout,
+          env: args.env,
+        });
+      },
+      isLoaded: async (args) => isScheduledTaskInstalled(args),
       readCommand: readScheduledTaskCommand,
-      readRuntime: readScheduledTaskRuntime,
+      readRuntime: async (env) => await readScheduledTaskRuntime(env),
+    };
+  }
+
+  if (process.platform === "android") {
+    return {
+      label: "Manual (Android)",
+      loadedText: "active",
+      notLoadedText: "inactive",
+      install: async () => {
+        throw new Error(
+          "Automatic service installation is not supported on Android. Please run the gateway manually using 'openclaw gateway start'.",
+        );
+      },
+      uninstall: async () => {},
+      stop: async () => {},
+      restart: async () => {},
+      isLoaded: async () => false,
+      readCommand: async () => null,
+      readRuntime: async () => ({ status: "stopped", pid: undefined }),
     };
   }
 
