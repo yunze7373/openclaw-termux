@@ -543,9 +543,39 @@ create_cli_entries() {
 setup_service() {
     if [[ "$PLATFORM" == "termux" ]]; then
         if check_command pm2; then
+            print_substep "配置 PM2 服务..."
+
+            # 1. 停止并删除旧服务
+            pm2 stop openclaw-gateway > /dev/null 2>&1 || true
             pm2 delete openclaw-gateway > /dev/null 2>&1 || true
-            pm2 start "$OPENCLAW_BIN" --name openclaw-gateway --interpreter node -- gateway start > /dev/null 2>&1
+            sleep 1  # 等待删除完成
+
+            # 2. 从配置文件中读取 token（如果存在）
+            local GATEWAY_TOKEN=""
+            if [[ -f "$PROJECT_ROOT/openclaw.json" ]]; then
+                # 尝试从网关配置部分读取 token
+                GATEWAY_TOKEN=$(jq -r '.gateway.auth.token // empty' "$PROJECT_ROOT/openclaw.json" 2>/dev/null || \
+                    grep -o '"token"[[:space:]]*:[[:space:]]*"[^"]*"' "$PROJECT_ROOT/openclaw.json" 2>/dev/null | \
+                    sed 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' | head -1)
+            fi
+
+            # 3. 启动新服务，传递必要的环境变量
+            local PM2_ENV=""
+            if [[ -n "$GATEWAY_TOKEN" ]]; then
+                PM2_ENV="--env OPENCLAW_GATEWAY_TOKEN=$GATEWAY_TOKEN"
+            fi
+
+            # 4. 使用 --force 确保 pm2 使用最新配置
+            pm2 start "$OPENCLAW_BIN" \
+                --name openclaw-gateway \
+                --interpreter node \
+                $PM2_ENV \
+                --force \
+                -- gateway start > /dev/null 2>&1
+
+            # 5. 保存 PM2 进程列表（用于开机自启）
             pm2 save > /dev/null 2>&1
+
             print_success "PM2 服务已配置"
         else
             print_warn "pm2 未安装，跳过服务配置"
