@@ -8,7 +8,9 @@
     "noEmitOnError": true,
     "outDir": "dist/plugin-sdk",
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/plugin-sdk/.tsbuildinfo"
+    "tsBuildInfoFile": "dist/plugin-sdk/.tsbuildinfo",
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true
   },
   "include": [
     "src/plugin-sdk/index.ts",
@@ -16,5 +18,11 @@
     "src/plugin-sdk/keyed-async-queue.ts",
     "src/types/**/*.d.ts"
   ],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/discord/**",
+    "src/shared/net/ip.ts"
+  ]
 }
