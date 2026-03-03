@@ -440,6 +440,42 @@ git push origin v2026.3.2-termux.1 --force
 
 ---
 
+## 部署后修复
+
+### 使用 `openclaw doctor --fix` 自动修复部署问题
+
+**问题：** 升级完成后，PM2 服务可能处于"假死"状态（显示 online 但实际无法连接），或出现以下问题：
+
+1. **PM2 服务配置不匹配** - PM2 中运行的程序入口指向了旧的路径（如 `dist/index.js`），但现在的安装逻辑更倾向于使用 `openclaw.mjs`
+2. **Token 认证不一致** - PM2 环境变量中的 `OPENCLAW_GATEWAY_TOKEN` 与配置文件 `openclaw.json` 中的不一致，导致 TUI 连接被拒绝
+3. **环境变量 PATH 问题** - PM2 记录的 PATH 包含过多包管理路径，导致模块加载冲突
+4. **UI 资源缺失** - 控制台 UI 资源没有编译
+
+**解决方案：** 运行 `openclaw doctor --fix` 自动修复：
+
+```bash
+cd ~/openclaw-termux
+
+# 运行自动修复
+openclaw doctor --fix
+```
+
+**自动修复内容：**
+- 重新编译 UI 资源
+- 同步并修复 PM2 服务配置（修正入口脚本、环境变量和 Token）
+- 重启 Gateway 服务
+
+**验证修复：**
+```bash
+# 检查服务状态
+openclaw status
+
+# 或运行深度检查
+openclaw doctor
+```
+
+---
+
 ## 有用的命令
 
 ```bash
