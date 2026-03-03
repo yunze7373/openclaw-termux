@@ -158,6 +158,16 @@
 
 - Rebrand/migration issues or legacy config/service warnings: run `openclaw doctor` (see `docs/gateway/doctor.md`).
 
+## Termux Upgrade Workflow
+
+- **Always disable tree-shaking**: tsdown/rolldown's tree-shaking generates `__exportAll` helper functions that fail on Termux/Android Node.js runtime. Keep `treeshake: false` in all `tsdown.config.ts` build entries.
+- **Build on-device**: never copy `dist/` from Windows/macOS to Termux; rebuild on the Termux device (`rm -rf dist && pnpm install && pnpm build`).
+- **Playwright types**: use `any` type aliases for `Dialog` and `FileChooser` in `src/browser/pw-tools-core.downloads.ts` to avoid TS2305 errors on Termux.
+- **Optional dependencies**: use `require()` with type assertions for optional deps (`https-proxy-agent`, `@discordjs/voice`, `ipaddr.js`).
+- **Type imports**: use explicit `import type { IPv4, IPv6 } from "ipaddr.js"` alongside `require("ipaddr.js")` for runtime usage.
+- **Discriminated unions**: extract properties to `const` before narrowing (e.g., `const reason = baseAccess.reason; if (reason === "...")`).
+- **Full upgrade guide**: see `docs/TERMUX-UPGRADE-GUIDE.md` for detailed error patterns and fixes.
+
 ## Agent-Specific Notes
 
 - Vocabulary: "makeup" = "mac app".
