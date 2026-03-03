@@ -31,6 +31,39 @@ git merge upstream/main --no-edit
 
 ---
 
+## 常见问题
+
+### 运行时错误：`__exportAll is not a function`
+
+**错误示例：**
+```
+[openclaw] Failed to start CLI: TypeError: __exportAll is not a function
+    at file:///data/data/com.termux/files/home/openclaw-termux/dist/plugins-Bp-KQ26x.js:475:39
+```
+
+**原因：** tsdown/rolldown 构建工具生成的 `__exportAll` 辅助函数在 Termux 设备上的 Node.js 运行时中无法正确执行。这通常是因为构建产物在 Windows 上生成，与 Termux/Linux 环境存在兼容性问题。
+
+**解决方案：** 在 Termux 设备上重新构建
+```bash
+cd ~/openclaw-termux
+
+# 清理旧的构建产物
+rm -rf dist
+
+# 重新安装依赖
+pnpm install
+
+# 重新构建
+pnpm build
+
+# 启动
+openclaw start
+```
+
+**注意：** 不要直接将 Windows 或 macOS 上构建的 `dist` 目录复制到 Termux 设备使用，必须在设备上重新构建。
+
+---
+
 ## 常见错误及解决方案
 
 ### 错误类型 1： discriminated union 类型访问错误
