@@ -1,4 +1,5 @@
-import ipaddr from "ipaddr.js";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const ipaddr = require("ipaddr.js") as typeof import("ipaddr.js");
 
 export type ParsedIpAddress = ipaddr.IPv4 | ipaddr.IPv6;
 type Ipv4Range = ReturnType<ipaddr.IPv4["range"]>;

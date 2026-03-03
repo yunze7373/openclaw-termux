@@ -1,6 +1,7 @@
 import { GatewayIntents, GatewayPlugin } from "@buape/carbon/gateway";
 import type { APIGatewayBotInfo } from "discord-api-types/v10";
-import { HttpsProxyAgent } from "https-proxy-agent";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { HttpsProxyAgent } = require("https-proxy-agent") as typeof import("https-proxy-agent");
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 import WebSocket from "ws";
 import type { DiscordAccountConfig } from "../../config/types.js";

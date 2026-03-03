@@ -5,7 +5,8 @@ import path from "node:path";
 import type { Readable } from "node:stream";
 import { ChannelType, type Client, ReadyListener } from "@buape/carbon";
 import type { VoicePlugin } from "@buape/carbon/voice";
-import {
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const {
   AudioPlayerStatus,
   EndBehaviorType,
   VoiceConnectionStatus,
@@ -13,9 +14,8 @@ import {
   createAudioResource,
   entersState,
   joinVoiceChannel,
-  type AudioPlayer,
-  type VoiceConnection,
-} from "@discordjs/voice";
+} = require("@discordjs/voice") as typeof import("@discordjs/voice");
+import type { AudioPlayer, VoiceConnection } from "@discordjs/voice";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import type { MsgContext } from "../../auto-reply/templating.js";
 import { agentCommandFromIngress } from "../../commands/agent.js";
@@ -586,7 +586,7 @@ export class DiscordVoiceManager {
         duration: SILENCE_DURATION_MS,
       },
     });
-    stream.on("error", (err) => {
+    stream.on("error", (err: Error) => {
       this.handleReceiveError(entry, err);
     });
 
