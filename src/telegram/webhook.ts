@@ -153,19 +153,21 @@ export async function startTelegramWebhook(opts: {
         emptyObjectOnEmpty: false,
       });
       if (!body.ok) {
-        if (body.code === "PAYLOAD_TOO_LARGE") {
-          respondText(413, body.error);
+        const code = body.code;
+        const error = body.error;
+        if (code === "PAYLOAD_TOO_LARGE") {
+          respondText(413, error);
           return;
         }
-        if (body.code === "REQUEST_BODY_TIMEOUT") {
-          respondText(408, body.error);
+        if (code === "REQUEST_BODY_TIMEOUT") {
+          respondText(408, error);
           return;
         }
-        if (body.code === "CONNECTION_CLOSED") {
-          respondText(400, body.error);
+        if (code === "CONNECTION_CLOSED") {
+          respondText(400, error);
           return;
         }
-        respondText(400, body.error);
+        respondText(400, error);
         return;
       }
 

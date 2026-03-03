@@ -41,7 +41,7 @@ function resolveWebMediaOptions(params: {
 }): WebMediaOptions {
   if (typeof params.maxBytesOrOptions === "number" || params.maxBytesOrOptions === undefined) {
     return {
-      maxBytes: params.maxBytesOrOptions,
+      maxBytes: params.maxBytesOrOptions as number | undefined,
       optimizeImages: params.optimizeImages,
       ssrfPolicy: params.options?.ssrfPolicy,
       localRoots: params.options?.localRoots,

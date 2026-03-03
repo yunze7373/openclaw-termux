@@ -227,10 +227,11 @@ async function resolveTelegramCommandAuth(params: {
     requireSenderForAllowOverride: true,
   });
   if (!baseAccess.allowed) {
-    if (baseAccess.reason === "group-disabled") {
+    const reason = baseAccess.reason;
+    if (reason === "group-disabled") {
       return await sendAuthMessage("This group is disabled.");
     }
-    if (baseAccess.reason === "topic-disabled") {
+    if (reason === "topic-disabled") {
       return await sendAuthMessage("This topic is disabled.");
     }
     return await rejectNotAuthorized();
@@ -255,16 +256,17 @@ async function resolveTelegramCommandAuth(params: {
     checkChatAllowlist: useAccessGroups,
   });
   if (!policyAccess.allowed) {
-    if (policyAccess.reason === "group-policy-disabled") {
+    const reason = policyAccess.reason;
+    if (reason === "group-policy-disabled") {
       return await sendAuthMessage("Telegram group commands are disabled.");
     }
     if (
-      policyAccess.reason === "group-policy-allowlist-no-sender" ||
-      policyAccess.reason === "group-policy-allowlist-unauthorized"
+      reason === "group-policy-allowlist-no-sender" ||
+      reason === "group-policy-allowlist-unauthorized"
     ) {
       return await rejectNotAuthorized();
     }
-    if (policyAccess.reason === "group-chat-not-allowed") {
+    if (reason === "group-chat-not-allowed") {
       return await sendAuthMessage("This group is not allowed.");
     }
   }
