@@ -4,6 +4,8 @@ import path from "node:path";
 import type * as playwright from "playwright-core";
 
 type Page = playwright.Page;
+type FileChooser = playwright.FileChooser;
+type Dialog = playwright.Dialog;
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
 import { writeViaSiblingTempPath } from "./output-atomic.js";
 import {
@@ -146,7 +148,7 @@ export async function armFileUploadViaPlaywright(opts: {
 
   void page
     .waitForEvent("filechooser", { timeout })
-    .then(async (fileChooser: playwright.FileChooser) => {
+    .then(async (fileChooser: FileChooser) => {
       if (state.armIdUpload !== armId) {
         return;
       }
@@ -209,7 +211,7 @@ export async function armDialogViaPlaywright(opts: {
 
   void page
     .waitForEvent("dialog", { timeout })
-    .then(async (dialog: playwright.Dialog) => {
+    .then(async (dialog: Dialog) => {
       if (state.armIdDialog !== armId) {
         return;
       }
