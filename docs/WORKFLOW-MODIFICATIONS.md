@@ -83,6 +83,18 @@
 
 记录所有工作流修改，方便下次升级时参考。
 
+### .github/workflows/cleanup.yml
+
+自动清理超过 7 天的 artifacts 和 workflow runs，防止 GitHub Actions 存储超限。
+
+**触发条件：**
+- 每周日凌晨 3 点自动运行
+- 或手动触发（workflow_dispatch）
+
+**清理内容：**
+- 超过 7 天的 artifacts
+- 超过 7 天且已完成的 workflow runs
+
 ## 升级时的操作建议
 
 当从上游 `openclaw/openclaw` 合并更新时：
