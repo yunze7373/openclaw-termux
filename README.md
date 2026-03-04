@@ -48,9 +48,16 @@ This fork maintains **100% feature parity** with the original OpenClaw while add
 
 ### 📸 Gallery
 
-| Termux Dashboard | Chat Interface |
-|:---:|:---:|
-| <img src="assets/termux-dashboard.png" alt="Termux Dashboard" width="100%"> | <img src="assets/image.png" alt="Chat" width="100%"> |
+> Screenshots of OpenClaw running on Termux/Android devices.
+
+| Feature | Description |
+|---------|-------------|
+| 📱 Dashboard | Web-based TUI accessible from any browser |
+| 💬 Chat Interface | Native-like chat UI with canvas support |
+| 🔔 Notifications | System notifications via Termux:API |
+| 📦 Package Management | Full pnpm/npm compatibility |
+
+*Add your own screenshots by contributing to this repo!*
 
 ---
 
