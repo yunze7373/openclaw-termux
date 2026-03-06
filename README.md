@@ -1,4 +1,4 @@
-# 🦞 OpenClaw — Personal AI Assistant (Termux Fork)
+# 🦞 OpenClaw (Termux Fork)
 
 <p align="center">
     <picture>
@@ -8,22 +8,26 @@
 </p>
 
 <p align="center">
-  <strong>EXFOLIATE! EXFOLIATE!</strong>
-</p>
-
-<p align="center">
   <a href="https://github.com/yunze7373/openclaw-termux/actions/workflows/ci.yml?branch=main"><img src="https://img.shields.io/github/actions/workflow/status/yunze7373/openclaw-termux/ci.yml?branch=main&style=for-the-badge" alt="CI status"></a>
   <a href="https://github.com/yunze7373/openclaw-termux/releases"><img src="https://img.shields.io/github/v/release/yunze7373/openclaw-termux?include_prereleases&style=for-the-badge" alt="GitHub release"></a>
   <a href="https://discord.gg/clawd"><img src="https://img.shields.io/discord/1456350064065904867?label=Discord&logo=discord&logoColor=white&color=5865F2&style=for-the-badge" alt="Discord"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
 </p>
 
-**OpenClaw (Termux Fork)** is a _personal AI assistant_ optimized for **Android/Termux** devices.
-It answers you on the channels you already use (WhatsApp, Telegram, Slack, Discord, Google Chat, Signal, iMessage, BlueBubbles, IRC, Microsoft Teams, Matrix, Feishu, LINE, Mattermost, Nextcloud Talk, Nostr, Synology Chat, Tlon, Twitch, Zalo, Zalo Personal, WebChat). It can speak and listen on macOS/iOS/Android, and can render a live Canvas you control.
+**openclaw-termux** is an Android / Termux runtime and compatibility-focused fork of OpenClaw.
+
+It extends the OpenClaw ecosystem to mobile, sandboxed, and low-cost devices, while maintaining compatibility with dependencies and workflows that were not originally designed for Termux environments.
 
 > **🚀 Run full-featured OpenClaw on any Android device — even a $30 used phone!**
 
-This fork maintains **100% feature parity** with the original OpenClaw while adding **native Termux/Android compatibility**. You get the same powerful AI assistant experience on a budget Android phone as you would on a high-end server.
+This repository is a platform-focused OpenClaw fork that extends the ecosystem to Android / Termux environments. It is not only a feature fork, but also a compatibility and maintenance effort for running AI-agent workflows on sandboxed, low-cost mobile hardware. In addition to platform adaptation, this project maintains compatibility with upstream and downstream dependencies that were not originally designed for Termux, which helps make the broader ecosystem more accessible on mobile devices.
+
+**Key achievements:**
+- ✅ **100% feature parity** with upstream OpenClaw
+- ✅ **50+ compatibility patches** for Android/Termux environments
+- ✅ **Dependency maintenance** for sqlite-vec, canvas, and native modules compiled from source
+- ✅ **PM2 service management** replacing systemd/launchd for Termux
+- ✅ **Ongoing upstream sync** with openclaw/openclaw main branch
 
 ---
 
