@@ -1,0 +1,64 @@
+name: Termux Compatibility
+
+on:
+  push:
+    branches: [main, upgrade-termux-*]
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tsdown.config.ts'
+      - 'scripts/termux-*'
+
+concurrency:
+  group: termux-compat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  patch-verify:
+    name: Verify Termux Patches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run patch verification
+        run: bash scripts/termux-patch-verify.sh
+
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: patch-verify
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Run smoke tests
+        run: bash scripts/termux-smoke-tests.sh
+
+  compat-analyzer:
+    name: Compatibility Analysis
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream for comparison
+        run: |
+          git remote add upstream https://github.com/openclaw/openclaw.git 2>/dev/null || true
+          git fetch upstream main --depth=50
+
+      - name: Run compatibility analyzer
+        run: bash scripts/termux-compat-analyzer.sh
