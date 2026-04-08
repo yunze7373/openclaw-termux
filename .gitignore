@@ -128,3 +128,5 @@ memory/
 /GEMINI.md
 /XIAOJI.md
 /PROJECT-CONTEXT.md
+.progress/
+.agents/
