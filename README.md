@@ -173,6 +173,13 @@ openclaw agent --message "Ship checklist" --thinking high
 - [FAQ](https://docs.openclaw.ai/help/faq)
 - [Discord](https://discord.gg/clawd)
 
+### Termux-Specific Docs
+
+- [Termux Modifications Reference](docs/TERMUX-MODIFICATIONS.md) — All changes vs upstream
+- [Termux Upgrade Checklist](docs/TERMUX-UPGRADE-CHECKLIST.md) — Step-by-step upgrade guide
+- [Termux Upgrade Guide](docs/TERMUX-UPGRADE-GUIDE.md) — Detailed error patterns & fixes
+- [Android Fixes (EN)](ANDROID_FIXES.md) / [Android Fixes (中文)](ANDROID_FIXES_CN.md)
+
 ---
 
 ## 🤝 Sponsors
